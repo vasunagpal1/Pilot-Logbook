@@ -5,6 +5,12 @@ const SPLIT_FIELD_PREFIX = "split__";
 const PRINT_PAGE_ENTRY_LIMIT = 18;
 const PRINT_PAGE_MIN_BLANK_ROWS = 6;
 const REQUIRED_FIELDS = ["date", "type", "registration", "pilotInCommand"];
+const ALL_LEDGER_COLUMN_INDICES = Array.from({ length: 32 }, (_, index) => index + 1);
+const HEADER_SPAN_MAP = {
+  group: [[1], [2], [3], [4], [5], [6], [7, 8, 9], [10, 11], [12, 13], [14, 15, 16, 17, 18, 19, 20, 21], [22, 23, 24, 25, 26, 27, 28, 29], [30, 31], [32]],
+  subgroup: [[7], [8], [9], [10], [11], [12], [13], [14, 15, 16, 17], [18, 19, 20, 21], [22, 23, 24, 25], [26, 27, 28, 29], [30], [31]],
+  micro: [[14], [15], [16], [17], [18], [19], [20], [21], [22], [23], [24], [25], [26], [27], [28], [29]],
+};
 
 const TIME_FIELDS = [
   "seDayDual",
@@ -104,6 +110,7 @@ const state = {
   splitSourceId: null,
   ledgerInteractionMode: "edit",
   hideZeroValues: loadDisplayPreferences().hideZeroValues,
+  hideEmptyColumns: loadDisplayPreferences().hideEmptyColumns,
   dragId: null,
   dragPosition: null,
 };
@@ -137,6 +144,7 @@ const bulkConsole = document.querySelector(".bulk-console");
 const ledgerModeStatus = document.querySelector("#ledger-mode-status");
 const ledgerModeToggle = document.querySelector(".ledger-mode-toggle");
 const hideZeroValuesToggle = document.querySelector("#hide-zero-values");
+const hideEmptyColumnsToggle = document.querySelector("#hide-empty-columns");
 const deleteSelectedButton = document.querySelector("#delete-selected");
 const deleteAllButton = document.querySelector("#delete-all");
 const ledgerColgroupMarkup = ledgerTable.querySelector("colgroup").outerHTML;
@@ -169,6 +177,7 @@ function bindEvents() {
   ledgerModeToggle.addEventListener("click", handleLedgerModeAction);
   ledgerScroller.addEventListener("scroll", syncStickyLedgerHeaderOffsets);
   hideZeroValuesToggle.addEventListener("change", handleDisplayPreferenceChange);
+  hideEmptyColumnsToggle.addEventListener("change", handleDisplayPreferenceChange);
   window.addEventListener("resize", syncStickyLedgerHeaderOffsets);
 
   ledgerBody.addEventListener("click", (event) => {
@@ -536,6 +545,7 @@ function handleLedgerModeAction(event) {
 
 function handleDisplayPreferenceChange() {
   state.hideZeroValues = hideZeroValuesToggle.checked;
+  state.hideEmptyColumns = hideEmptyColumnsToggle.checked;
   persistDisplayPreferences();
   render();
 }
@@ -804,6 +814,7 @@ function renderLedgerMode() {
 
 function renderDisplayPreferences() {
   hideZeroValuesToggle.checked = state.hideZeroValues;
+  hideEmptyColumnsToggle.checked = state.hideEmptyColumns;
 }
 
 function createEntryCard(entry, index) {
@@ -857,6 +868,7 @@ function renderLedger() {
 
   ledgerBody.innerHTML = rows + blanks;
   ledgerFooter.innerHTML = createFooter();
+  applyLedgerColumnVisibility();
 }
 
 function renderPrintLedgerPages() {
@@ -883,7 +895,7 @@ function createLedgerRow(entry) {
       .filter(Boolean)
       .join(" ");
 
-    return `<td class="${classes}">${escapeHtml(value)}</td>`;
+    return `<td class="${classes}" data-column-index="${index + 1}">${escapeHtml(value)}</td>`;
   }).join("");
 
   return `
@@ -896,7 +908,7 @@ function createLedgerRow(entry) {
 function createBlankRow() {
   return `
     <tr class="blank-row" aria-hidden="true">
-      ${Array.from({ length: LEDGER_FIELDS.length }, () => "<td>&nbsp;</td>").join("")}
+      ${Array.from({ length: LEDGER_FIELDS.length }, (_, index) => `<td data-column-index="${index + 1}">&nbsp;</td>`).join("")}
     </tr>
   `;
 }
@@ -971,9 +983,11 @@ function createSumFooterRow({ label, entries, note, isManual = false }) {
 
   return `
     <tr>
-      <th colspan="7" class="footer-label">${escapeHtml(label)}</th>
-      ${totals.map((value) => `<td class="cell-center">${value}</td>`).join("")}
-      <td class="footer-note">${escapeHtml(note)}</td>
+      <th colspan="7" class="footer-label" data-footer-label="true">${escapeHtml(label)}</th>
+      ${totals
+        .map((value, index) => `<td class="cell-center" data-column-index="${index + 8}">${value}</td>`)
+        .join("")}
+      <td class="footer-note" data-column-index="32">${escapeHtml(note)}</td>
     </tr>
   `;
 }
@@ -1005,6 +1019,93 @@ function buildSplitEditor() {
         .replace(/\srequired(="[^"]*")?/g, "")
     )
     .join("");
+}
+
+function applyLedgerColumnVisibility() {
+  if (!ledgerTable) {
+    return;
+  }
+
+  const visibleColumns = getVisibleLedgerColumns();
+
+  [...ledgerTable.querySelectorAll("colgroup col")].forEach((col, index) => {
+    col.classList.toggle("is-column-hidden", !visibleColumns.has(index + 1));
+  });
+
+  applyLeafCellVisibility(ledgerTable.querySelectorAll("thead tr.index-row th"), visibleColumns);
+  applyLeafCellVisibility(ledgerTable.querySelectorAll("tbody tr td"), visibleColumns);
+  applyMergedHeaderVisibility("group", visibleColumns);
+  applyMergedHeaderVisibility("subgroup", visibleColumns);
+  applyMergedHeaderVisibility("micro", visibleColumns);
+  applyFooterVisibility(visibleColumns);
+}
+
+function getVisibleLedgerColumns() {
+  if (!state.hideEmptyColumns || !state.entries.length) {
+    return new Set(ALL_LEDGER_COLUMN_INDICES);
+  }
+
+  const visibleColumns = new Set();
+
+  LEDGER_FIELDS.forEach((field, index) => {
+    const hasVisibleValue = state.entries.some((entry) => hasVisibleLedgerValue(field, entry[field]));
+    if (hasVisibleValue) {
+      visibleColumns.add(index + 1);
+    }
+  });
+
+  return visibleColumns.size ? visibleColumns : new Set(ALL_LEDGER_COLUMN_INDICES);
+}
+
+function hasVisibleLedgerValue(field, value) {
+  if (SUMMABLE_FIELDS.includes(field)) {
+    return toNumber(value) !== 0;
+  }
+
+  return String(value ?? "").trim() !== "";
+}
+
+function applyLeafCellVisibility(cells, visibleColumns) {
+  [...cells].forEach((cell, index) => {
+    const columnIndex = Number(cell.dataset.columnIndex || index + 1);
+    cell.dataset.columnIndex = String(columnIndex);
+    cell.classList.toggle("is-column-hidden", !visibleColumns.has(columnIndex));
+  });
+}
+
+function applyMergedHeaderVisibility(rowKey, visibleColumns) {
+  const row = ledgerTable.querySelector(`thead tr.${rowKey}-row`);
+  if (!row) {
+    return;
+  }
+
+  [...row.children].forEach((cell, index) => {
+    const coveredColumns = HEADER_SPAN_MAP[rowKey][index];
+    const visibleCount = coveredColumns.filter((columnIndex) => visibleColumns.has(columnIndex)).length;
+
+    cell.classList.toggle("is-column-hidden", visibleCount === 0);
+
+    if (visibleCount === 0) {
+      return;
+    }
+
+    if (coveredColumns.length > 1) {
+      cell.colSpan = visibleCount;
+    }
+  });
+}
+
+function applyFooterVisibility(visibleColumns) {
+  const leadingVisibleColumns = ALL_LEDGER_COLUMN_INDICES.filter((index) => index <= 7 && visibleColumns.has(index)).length;
+
+  ledgerFooter.querySelectorAll("[data-footer-label]").forEach((cell) => {
+    cell.colSpan = Math.max(leadingVisibleColumns, 1);
+  });
+
+  ledgerFooter.querySelectorAll("[data-column-index]").forEach((cell) => {
+    const columnIndex = Number(cell.dataset.columnIndex);
+    cell.classList.toggle("is-column-hidden", !visibleColumns.has(columnIndex));
+  });
 }
 
 function formatLedgerCell(field, value) {
@@ -1094,15 +1195,16 @@ function loadDisplayPreferences() {
   try {
     const raw = localStorage.getItem(DISPLAY_PREFERENCES_KEY);
     if (!raw) {
-      return { hideZeroValues: false };
+      return { hideZeroValues: false, hideEmptyColumns: false };
     }
 
     const parsed = JSON.parse(raw);
     return {
       hideZeroValues: Boolean(parsed?.hideZeroValues),
+      hideEmptyColumns: Boolean(parsed?.hideEmptyColumns),
     };
   } catch (error) {
-    return { hideZeroValues: false };
+    return { hideZeroValues: false, hideEmptyColumns: false };
   }
 }
 
@@ -1123,6 +1225,7 @@ function persistDisplayPreferences() {
     DISPLAY_PREFERENCES_KEY,
     JSON.stringify({
       hideZeroValues: state.hideZeroValues,
+      hideEmptyColumns: state.hideEmptyColumns,
     })
   );
 }
