@@ -778,14 +778,42 @@ body::before {
 }
 
 .table-scroller {
+  position: relative;
   width: 100%;
   max-width: 100%;
   overflow-x: auto;
-  overflow-y: hidden;
+  overflow-y: auto;
+  max-height: min(76vh, 980px);
   -webkit-overflow-scrolling: touch;
   border-radius: 24px;
   border: 1px solid rgba(67, 57, 45, 0.18);
   background: rgba(255, 255, 255, 0.18);
+}
+
+.ledger-sticky-head {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  height: 0;
+  pointer-events: none;
+  transform: translateX(0);
+}
+
+.ledger-sticky-head.is-shadowed .logbook-table--sticky {
+  box-shadow: 0 14px 24px rgba(42, 36, 28, 0.16);
+}
+
+.logbook-table--sticky {
+  background: var(--paper);
+}
+
+.logbook-table--sticky thead th {
+  background: rgba(246, 239, 223, 0.98);
+}
+
+.logbook-table--sticky th,
+.logbook-table--sticky td {
+  border-color: rgba(42, 36, 28, 0.32);
 }
 
 .logbook-table {
@@ -990,6 +1018,10 @@ body::before {
   .panel-scroll {
     overflow-y: auto;
   }
+
+  .table-scroller {
+    max-height: calc(100vh - 210px);
+  }
 }
 
 @media (max-width: 1480px) {
@@ -1021,6 +1053,10 @@ body::before {
   .panel-scroll {
     overflow: visible;
     padding-right: 0;
+  }
+
+  .table-scroller {
+    max-height: 72vh;
   }
 
   .entry-form {
@@ -1144,6 +1180,11 @@ body::before {
 
   .table-scroller {
     overflow: visible;
+    max-height: none;
+  }
+
+  .ledger-sticky-head {
+    display: none !important;
   }
 
   .paper-frame,
