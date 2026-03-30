@@ -728,7 +728,7 @@ function render() {
 }
 
 function renderSummary() {
-  const totalHours = state.entries.reduce((sum, entry) => sum + sumTimeColumns(entry), 0);
+  const totalHours = state.entries.reduce((sum, entry) => sum + sumHeadlineFlightTime(entry), 0);
   const totalLandings = state.entries.reduce(
     (sum, entry) => sum + toNumber(entry.landingsDay) + toNumber(entry.landingsNight),
     0
@@ -736,8 +736,7 @@ function renderSummary() {
   const totals = state.entries.reduce(
     (summary, entry) => {
       summary.ifActual += toNumber(entry.instrumentActual);
-      summary.fstd +=
-        toNumber(entry.instrumentFstd) + toNumber(entry.fstdPrimary) + toNumber(entry.fstdSecondary);
+      summary.fstd += toNumber(entry.instrumentFstd);
       summary.seDual += toNumber(entry.seDayDual) + toNumber(entry.seNightDual);
       summary.picDay += toNumber(entry.seDayPic) + toNumber(entry.meDayPic);
       summary.picNight += toNumber(entry.seNightPic) + toNumber(entry.meNightPic);
@@ -1174,6 +1173,18 @@ function isCenteredField(field) {
 function sumTimeColumns(entry, asText = false) {
   const total = TIME_FIELDS.reduce((sum, field) => sum + toNumber(entry[field]), 0);
   return asText ? formatTotal(total) : total;
+}
+
+function sumHeadlineFlightTime(entry) {
+  return (
+    toNumber(entry.seDayDual) +
+    toNumber(entry.seDayPic) +
+    toNumber(entry.seNightDual) +
+    toNumber(entry.seNightPic) +
+    toNumber(entry.meDayDual) +
+    toNumber(entry.meNightDual) +
+    toNumber(entry.meNightPic)
+  );
 }
 
 function formatFooterNumber(value, integer = false, showZero = true) {
