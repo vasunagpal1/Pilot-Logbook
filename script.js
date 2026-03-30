@@ -1,5 +1,7 @@
 const STORAGE_KEY = "pilot-logbook-atelier-v1";
 const SUM_SELECTION_KEY = "pilot-logbook-atelier-sum-selection-v1";
+const PRINT_PAGE_ENTRY_LIMIT = 18;
+const PRINT_PAGE_MIN_BLANK_ROWS = 6;
 
 const TIME_FIELDS = [
   "seDayDual",
@@ -108,6 +110,8 @@ const formTitle = document.querySelector("#form-title");
 const formStatus = document.querySelector("#form-status");
 const ledgerBody = document.querySelector("#ledger-body");
 const ledgerFooter = document.querySelector("#ledger-footer");
+const ledgerTable = document.querySelector("#logbook-table");
+const printLedgerPages = document.querySelector("#print-ledger-pages");
 const entryList = document.querySelector("#entry-list");
 const emptyState = document.querySelector("#empty-state");
 const entryCount = document.querySelector("#entry-count");
@@ -119,6 +123,8 @@ const bulkStatus = document.querySelector("#bulk-status");
 const bulkConsole = document.querySelector(".bulk-console");
 const deleteSelectedButton = document.querySelector("#delete-selected");
 const deleteAllButton = document.querySelector("#delete-all");
+const ledgerColgroupMarkup = ledgerTable.querySelector("colgroup").outerHTML;
+const ledgerHeadMarkup = ledgerTable.querySelector("thead").outerHTML;
 
 boot();
 
@@ -540,6 +546,7 @@ function render() {
   renderBulkConsole();
   renderManifest();
   renderLedger();
+  renderPrintLedgerPages();
 }
 
 function renderSummary() {
@@ -649,11 +656,24 @@ function createEntryCard(entry, index) {
 
 function renderLedger() {
   const rows = state.entries.map((entry) => createLedgerRow(entry)).join("");
-  const blankCount = Math.max(18 - state.entries.length, 6);
+  const blankCount = Math.max(PRINT_PAGE_ENTRY_LIMIT - state.entries.length, PRINT_PAGE_MIN_BLANK_ROWS);
   const blanks = Array.from({ length: blankCount }, () => createBlankRow()).join("");
 
   ledgerBody.innerHTML = rows + blanks;
   ledgerFooter.innerHTML = createFooter();
+}
+
+function renderPrintLedgerPages() {
+  if (!printLedgerPages) {
+    return;
+  }
+
+  const entryPages = chunkEntries(state.entries, PRINT_PAGE_ENTRY_LIMIT);
+  const pages = entryPages.length ? entryPages : [[]];
+
+  printLedgerPages.innerHTML = pages
+    .map((entries, index) => createPrintLedgerPage(entries, index, pages.length))
+    .join("");
 }
 
 function createLedgerRow(entry) {
@@ -682,6 +702,40 @@ function createBlankRow() {
     <tr class="blank-row" aria-hidden="true">
       ${Array.from({ length: LEDGER_FIELDS.length }, () => "<td>&nbsp;</td>").join("")}
     </tr>
+  `;
+}
+
+function createPrintLedgerPage(entries, pageIndex, totalPages) {
+  const rows = entries.map((entry) => createLedgerRow(entry)).join("");
+  const blankCount = Math.max(PRINT_PAGE_ENTRY_LIMIT - entries.length, PRINT_PAGE_MIN_BLANK_ROWS);
+  const blanks = Array.from({ length: blankCount }, () => createBlankRow()).join("");
+  const pageLabel = totalPages > 1 ? `Page ${pageIndex + 1} of ${totalPages}` : "Landscape print sheet";
+
+  return `
+    <article class="print-sheet">
+      <div class="paper-frame">
+        <div class="paper-sheet">
+          <div class="paper-title">
+            <div>
+              <p class="paper-label">Pilot Logbook</p>
+              <h3>Flight entries ledger</h3>
+            </div>
+            <div class="paper-meta">
+              <p class="paper-credit">${escapeHtml(pageLabel)}</p>
+              <p class="paper-credit">Made by Uran Khatola</p>
+            </div>
+          </div>
+          <div class="table-scroller">
+            <table class="logbook-table">
+              ${ledgerColgroupMarkup}
+              ${ledgerHeadMarkup}
+              <tbody>${rows + blanks}</tbody>
+              ${pageIndex === totalPages - 1 ? `<tfoot>${createFooter()}</tfoot>` : ""}
+            </table>
+          </div>
+        </div>
+      </div>
+    </article>
   `;
 }
 
@@ -726,6 +780,20 @@ function createSumFooterRow({ label, entries, note, isManual = false }) {
       <td class="footer-note">${escapeHtml(note)}</td>
     </tr>
   `;
+}
+
+function chunkEntries(entries, chunkSize) {
+  if (!entries.length) {
+    return [];
+  }
+
+  const pages = [];
+
+  for (let index = 0; index < entries.length; index += chunkSize) {
+    pages.push(entries.slice(index, index + chunkSize));
+  }
+
+  return pages;
 }
 
 function formatLedgerCell(field, value) {

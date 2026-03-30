@@ -666,6 +666,10 @@ body::before {
   padding: 18px;
 }
 
+.print-ledger-pages {
+  display: none;
+}
+
 .paper-frame {
   padding: 12px;
   border-radius: calc(var(--radius-lg) + 4px);
@@ -976,14 +980,16 @@ body::before {
 
 @page {
   size: A4 landscape;
-  margin: 4mm;
+  margin: 3mm;
 }
 
 @media print {
+  html,
   body {
     margin: 0;
     background: white;
     color: black;
+    overflow: visible !important;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
@@ -992,16 +998,17 @@ body::before {
   .hero-shell,
   .entry-stage,
   .ledger-header,
+  .ledger-stage,
   .paper-subtitle {
     display: none !important;
   }
 
   .app-shell,
-  .ledger-panel,
-  .panel-ledger,
   .paper-frame,
   .paper-sheet,
-  .table-scroller {
+  .table-scroller,
+  .print-ledger-pages,
+  .print-sheet {
     width: 100%;
     margin: 0;
     padding: 0;
@@ -1011,46 +1018,67 @@ body::before {
   }
 
   .app-shell,
-  .ledger-stage {
+  .print-ledger-pages {
     display: block;
   }
 
+  .print-sheet {
+    break-after: page;
+    page-break-after: always;
+    break-inside: avoid-page;
+    page-break-inside: avoid;
+  }
+
+  .print-sheet:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
   .paper-title {
-    margin-bottom: 3mm;
+    margin-bottom: 2mm;
   }
 
   .paper-title h3 {
-    font-size: 13pt;
+    font-size: 11pt;
   }
 
   .paper-label {
     margin-bottom: 2px;
-    font-size: 6.5pt;
+    font-size: 6pt;
   }
 
   .table-scroller {
     overflow: visible;
   }
 
+  .paper-frame,
+  .paper-sheet,
+  .table-scroller,
   .logbook-table {
-    width: 277mm !important;
-    max-width: 277mm !important;
-    font-size: 7px;
-    line-height: 1.02;
+    break-inside: avoid-page;
+    page-break-inside: avoid;
+  }
+
+  .logbook-table {
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    font-size: 6.2px;
+    line-height: 1;
   }
 
   .logbook-table th,
   .logbook-table td {
-    padding: 1.2mm 0.8mm !important;
+    padding: 1mm 0.65mm !important;
   }
 
   .logbook-table thead tr.index-row th {
-    padding: 0.6mm 0.4mm !important;
-    font-size: 5.5px;
+    padding: 0.45mm 0.35mm !important;
+    font-size: 5px;
   }
 
   .logbook-table thead tr.group-row th {
-    font-size: 7px;
+    font-size: 6.2px;
   }
 
   .logbook-table thead tr.group-row th span,
@@ -1059,51 +1087,56 @@ body::before {
   .logbook-table tfoot th,
   .logbook-table tfoot td,
   .footer-note {
-    font-size: 6px;
+    font-size: 5.3px;
   }
 
   .logbook-table tbody td {
-    min-height: 6.5mm !important;
-    height: 6.5mm !important;
+    min-height: 5.8mm !important;
+    height: 5.8mm !important;
+  }
+
+  .logbook-table td.cell-wrap {
+    font-size: 5.7px;
+    line-height: 1.02;
   }
 
   .w-date {
-    width: 12mm !important;
-  }
-
-  .w-type {
-    width: 10mm !important;
-  }
-
-  .w-reg {
     width: 11mm !important;
   }
 
-  .w-pic {
-    width: 14mm !important;
+  .w-type {
+    width: 9mm !important;
   }
 
-  .w-details {
-    width: 42mm !important;
-  }
-
-  .w-nav {
+  .w-reg {
     width: 10mm !important;
   }
 
+  .w-pic {
+    width: 13mm !important;
+  }
+
+  .w-details {
+    width: 40mm !important;
+  }
+
+  .w-nav {
+    width: 9mm !important;
+  }
+
   .w-small {
-    width: 7mm !important;
+    width: 6.5mm !important;
   }
 
   .w-hour {
-    width: 5.8mm !important;
+    width: 5.4mm !important;
   }
 
   .w-landings {
-    width: 5mm !important;
+    width: 4.7mm !important;
   }
 
   .w-remarks {
-    width: 26mm !important;
+    width: 23mm !important;
   }
 }
