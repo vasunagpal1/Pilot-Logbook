@@ -124,7 +124,6 @@ const ledgerBody = document.querySelector("#ledger-body");
 const ledgerFooter = document.querySelector("#ledger-footer");
 const ledgerTable = document.querySelector("#logbook-table");
 const ledgerScroller = document.querySelector(".ledger-stage .table-scroller");
-const ledgerStickyHead = document.querySelector("#ledger-sticky-head");
 const printLedgerPages = document.querySelector("#print-ledger-pages");
 const entryList = document.querySelector("#entry-list");
 const emptyState = document.querySelector("#empty-state");
@@ -147,7 +146,6 @@ boot();
 
 function boot() {
   buildSplitEditor();
-  buildStickyLedgerHeader();
   bindEvents();
   seedDefaultDate();
   render();
@@ -169,8 +167,9 @@ function bindEvents() {
   sumConsole.addEventListener("click", handleSumConsoleAction);
   bulkConsole.addEventListener("click", handleBulkConsoleAction);
   ledgerModeToggle.addEventListener("click", handleLedgerModeAction);
-  ledgerScroller.addEventListener("scroll", syncStickyLedgerHeader);
+  ledgerScroller.addEventListener("scroll", syncStickyLedgerHeaderOffsets);
   hideZeroValuesToggle.addEventListener("change", handleDisplayPreferenceChange);
+  window.addEventListener("resize", syncStickyLedgerHeaderOffsets);
 
   ledgerBody.addEventListener("click", (event) => {
     const row = event.target.closest(".filled-row[data-entry-id]");
@@ -699,7 +698,7 @@ function render() {
   renderManifest();
   renderLedger();
   renderPrintLedgerPages();
-  syncStickyLedgerHeader();
+  syncStickyLedgerHeaderOffsets();
 }
 
 function renderSummary() {
@@ -1008,21 +1007,6 @@ function buildSplitEditor() {
     .join("");
 }
 
-function buildStickyLedgerHeader() {
-  if (!ledgerStickyHead) {
-    return;
-  }
-
-  ledgerStickyHead.innerHTML = `
-    <table class="logbook-table logbook-table--sticky" aria-hidden="true">
-      ${ledgerColgroupMarkup}
-      ${ledgerHeadMarkup}
-    </table>
-  `;
-
-  syncStickyLedgerHeader();
-}
-
 function formatLedgerCell(field, value) {
   if (!value) {
     return "";
@@ -1242,17 +1226,31 @@ function restoreLedgerView(view) {
     }
 
     window.scrollTo({ top: view.pageScrollTop ?? view.scrollTop ?? 0 });
-    syncStickyLedgerHeader();
+    syncStickyLedgerHeaderOffsets();
   });
 }
 
-function syncStickyLedgerHeader() {
-  if (!ledgerStickyHead || !ledgerScroller) {
+function syncStickyLedgerHeaderOffsets() {
+  if (!ledgerTable || !ledgerScroller) {
     return;
   }
 
-  ledgerStickyHead.style.transform = `translateX(${-ledgerScroller.scrollLeft}px)`;
-  ledgerStickyHead.classList.toggle("is-shadowed", ledgerScroller.scrollTop > 8);
+  const indexRow = ledgerTable.querySelector("thead .index-row");
+  const groupRow = ledgerTable.querySelector("thead .group-row");
+  const subgroupRow = ledgerTable.querySelector("thead .subgroup-row");
+
+  const indexHeight = indexRow?.getBoundingClientRect().height ?? 0;
+  const groupHeight = groupRow?.getBoundingClientRect().height ?? 0;
+  const subgroupHeight = subgroupRow?.getBoundingClientRect().height ?? 0;
+
+  ledgerScroller.style.setProperty("--sticky-index-top", "0px");
+  ledgerScroller.style.setProperty("--sticky-group-top", `${indexHeight}px`);
+  ledgerScroller.style.setProperty("--sticky-subgroup-top", `${indexHeight + groupHeight}px`);
+  ledgerScroller.style.setProperty(
+    "--sticky-micro-top",
+    `${indexHeight + groupHeight + subgroupHeight}px`
+  );
+  ledgerScroller.classList.toggle("is-header-shadowed", ledgerScroller.scrollTop > 8);
 }
 
 function createId() {

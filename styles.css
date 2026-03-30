@@ -811,32 +811,6 @@ body::before {
   background: rgba(255, 255, 255, 0.18);
 }
 
-.ledger-sticky-head {
-  position: sticky;
-  top: 0;
-  z-index: 8;
-  height: 0;
-  pointer-events: none;
-  transform: translateX(0);
-}
-
-.ledger-sticky-head.is-shadowed .logbook-table--sticky {
-  box-shadow: 0 14px 24px rgba(42, 36, 28, 0.16);
-}
-
-.logbook-table--sticky {
-  background: var(--paper);
-}
-
-.logbook-table--sticky thead th {
-  background: rgba(246, 239, 223, 0.98);
-}
-
-.logbook-table--sticky th,
-.logbook-table--sticky td {
-  border-color: rgba(42, 36, 28, 0.32);
-}
-
 .logbook-table {
   width: max-content;
   min-width: 2100px;
@@ -855,25 +829,31 @@ body::before {
 }
 
 .logbook-table thead th {
+  position: sticky;
   text-align: center;
   font-weight: 600;
-  background: rgba(255, 255, 255, 0.4);
+  background: rgba(246, 239, 223, 0.98);
+  z-index: 4;
 }
 
 .logbook-table thead tr.index-row th {
+  top: var(--sticky-index-top, 0px);
   padding: 4px 2px;
   font-size: 0.7rem;
   font-weight: 500;
   color: var(--ink-soft);
   background: rgba(255, 255, 255, 0.28);
+  z-index: 7;
 }
 
 .logbook-table thead tr.group-row th {
+  top: var(--sticky-group-top, 0px);
   font-family: "Fraunces", serif;
   font-size: 1.04rem;
   line-height: 1.1;
   border-top: 1.5px solid var(--line);
   border-bottom: 1.5px solid var(--line);
+  z-index: 6;
 }
 
 .logbook-table thead tr.group-row th span {
@@ -891,6 +871,20 @@ body::before {
   font-size: 0.76rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.logbook-table thead tr.subgroup-row th {
+  top: var(--sticky-subgroup-top, 0px);
+  z-index: 5;
+}
+
+.logbook-table thead tr.micro-row th {
+  top: var(--sticky-micro-top, 0px);
+  z-index: 5;
+}
+
+.table-scroller.is-header-shadowed .logbook-table thead th {
+  box-shadow: 0 10px 18px rgba(42, 36, 28, 0.12);
 }
 
 .logbook-table tbody td {
