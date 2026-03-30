@@ -171,7 +171,7 @@ function bindEvents() {
     }
 
     if (state.ledgerInteractionMode === "select") {
-      toggleBulkSelection(row.dataset.entryId, undefined, { preserveLedgerView: true });
+      toggleSumSelection(row.dataset.entryId, { preserveLedgerView: true });
       return;
     }
 
@@ -779,8 +779,8 @@ function renderLedgerMode() {
 
   const isSelectMode = state.ledgerInteractionMode === "select";
   ledgerModeStatus.textContent = isSelectMode
-    ? "Select mode is on. Click filled ledger rows to add or remove them from bulk delete."
-    : "Edit mode is on. Click a filled row to edit it, or switch to Select rows to choose entries from the table.";
+    ? "Select mode is on. Click filled ledger rows to add or remove them from the manual subtotal."
+    : "Edit mode is on. Click a filled row to edit it, or switch to Select rows to choose entries for the manual subtotal.";
 
   ledgerModeToggle.querySelectorAll("[data-ledger-mode]").forEach((button) => {
     button.classList.toggle("is-selected", button.dataset.ledgerMode === state.ledgerInteractionMode);
@@ -1127,7 +1127,9 @@ function toggleBulkSelection(entryId, forceState, options = {}) {
   }
 }
 
-function toggleSumSelection(entryId) {
+function toggleSumSelection(entryId, options = {}) {
+  const ledgerView = options.preserveLedgerView ? captureLedgerView() : null;
+
   if (state.selectedSumIds.has(entryId)) {
     state.selectedSumIds.delete(entryId);
   } else {
@@ -1136,6 +1138,10 @@ function toggleSumSelection(entryId) {
 
   persistSelectedSumIds();
   render();
+
+  if (ledgerView) {
+    restoreLedgerView(ledgerView);
+  }
 }
 
 function scrollEditorIntoView() {
