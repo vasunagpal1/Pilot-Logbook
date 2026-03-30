@@ -340,6 +340,17 @@ body::before {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.instruction-groups {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
+  margin-top: 10px;
+}
+
+.instruction-card {
+  min-width: 0;
+}
+
 .field {
   display: grid;
   min-width: 0;
@@ -1108,7 +1119,8 @@ body::before {
   .hero-cards,
   .form-grid--four,
   .matrix-grid,
-  .form-grid--three {
+  .form-grid--three,
+  .instruction-groups {
     grid-template-columns: 1fr;
   }
 

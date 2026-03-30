@@ -114,22 +114,39 @@
                       <span>Instrument FSTD</span>
                       <input type="number" name="instrumentFstd" min="0" step="0.1" placeholder="1.3" />
                     </label>
-                    <label class="field">
-                      <span>Instructor SE</span>
-                      <input type="number" name="instructorSE" min="0" step="0.1" placeholder="0.8" />
-                    </label>
-                    <label class="field">
-                      <span>Instructor ME</span>
-                      <input type="number" name="instructorME" min="0" step="0.1" placeholder="0.4" />
-                    </label>
-                    <label class="field">
-                      <span>FSTD 1</span>
-                      <input type="number" name="fstdPrimary" min="0" step="0.1" placeholder="1.0" />
-                    </label>
-                    <label class="field">
-                      <span>FSTD 2</span>
-                      <input type="number" name="fstdSecondary" min="0" step="0.1" placeholder="1.0" />
-                    </label>
+                  </div>
+                  <div class="instruction-groups">
+                    <article class="matrix-card instruction-card instruction-card--wide">
+                      <div class="matrix-title">
+                        <h4>Instructor</h4>
+                        <p>Cols 10 to 12</p>
+                      </div>
+                      <div class="form-grid form-grid--three">
+                        <label class="field">
+                          <span>SE</span>
+                          <input type="number" name="instructorSE" min="0" step="0.1" placeholder="0.8" />
+                        </label>
+                        <label class="field">
+                          <span>ME</span>
+                          <input type="number" name="instructorME" min="0" step="0.1" placeholder="0.4" />
+                        </label>
+                        <label class="field">
+                          <span>FSTD 1</span>
+                          <input type="number" name="fstdPrimary" min="0" step="0.1" placeholder="1.0" />
+                        </label>
+                      </div>
+                    </article>
+
+                    <article class="matrix-card instruction-card">
+                      <div class="matrix-title">
+                        <h4>FSTD 2</h4>
+                        <p>Col 13</p>
+                      </div>
+                      <label class="field">
+                        <span>FSTD</span>
+                        <input type="number" name="fstdSecondary" min="0" step="0.1" placeholder="1.0" />
+                      </label>
+                    </article>
                   </div>
                 </section>
 
@@ -475,8 +492,8 @@
                         <span>Brought into use</span>
                       </th>
                       <th colspan="3">Instrument</th>
-                      <th colspan="2">Instructor</th>
-                      <th colspan="2">FSTD</th>
+                      <th colspan="3">Instructor</th>
+                      <th colspan="1">FSTD</th>
                       <th colspan="8">Single-Engine Aircraft</th>
                       <th colspan="8">Multi-Engine Aircraft</th>
                       <th colspan="2">Landings</th>
