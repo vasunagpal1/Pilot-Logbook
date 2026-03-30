@@ -533,6 +533,27 @@ body::before {
   gap: 8px;
 }
 
+.ledger-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.82rem;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+}
+
+.ledger-toggle input {
+  margin: 0;
+  width: 15px;
+  height: 15px;
+  accent-color: #f0ba6e;
+  cursor: pointer;
+}
+
 .entry-list {
   list-style: none;
   margin: 12px 0 0;

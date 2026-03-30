@@ -1,5 +1,6 @@
 const STORAGE_KEY = "pilot-logbook-atelier-v1";
 const SUM_SELECTION_KEY = "pilot-logbook-atelier-sum-selection-v1";
+const DISPLAY_PREFERENCES_KEY = "pilot-logbook-display-preferences-v1";
 const SPLIT_FIELD_PREFIX = "split__";
 const PRINT_PAGE_ENTRY_LIMIT = 18;
 const PRINT_PAGE_MIN_BLANK_ROWS = 6;
@@ -102,6 +103,7 @@ const state = {
   editingId: null,
   splitSourceId: null,
   ledgerInteractionMode: "edit",
+  hideZeroValues: loadDisplayPreferences().hideZeroValues,
   dragId: null,
   dragPosition: null,
 };
@@ -135,6 +137,7 @@ const bulkStatus = document.querySelector("#bulk-status");
 const bulkConsole = document.querySelector(".bulk-console");
 const ledgerModeStatus = document.querySelector("#ledger-mode-status");
 const ledgerModeToggle = document.querySelector(".ledger-mode-toggle");
+const hideZeroValuesToggle = document.querySelector("#hide-zero-values");
 const deleteSelectedButton = document.querySelector("#delete-selected");
 const deleteAllButton = document.querySelector("#delete-all");
 const ledgerColgroupMarkup = ledgerTable.querySelector("colgroup").outerHTML;
@@ -167,6 +170,7 @@ function bindEvents() {
   bulkConsole.addEventListener("click", handleBulkConsoleAction);
   ledgerModeToggle.addEventListener("click", handleLedgerModeAction);
   ledgerScroller.addEventListener("scroll", syncStickyLedgerHeader);
+  hideZeroValuesToggle.addEventListener("change", handleDisplayPreferenceChange);
 
   ledgerBody.addEventListener("click", (event) => {
     const row = event.target.closest(".filled-row[data-entry-id]");
@@ -531,6 +535,12 @@ function handleLedgerModeAction(event) {
   renderLedgerMode();
 }
 
+function handleDisplayPreferenceChange() {
+  state.hideZeroValues = hideZeroValuesToggle.checked;
+  persistDisplayPreferences();
+  render();
+}
+
 function startSplitEntry(entryId = state.editingId) {
   const sourceId = entryId || state.editingId;
   if (!sourceId) {
@@ -685,6 +695,7 @@ function render() {
   renderSumConsole();
   renderBulkConsole();
   renderLedgerMode();
+  renderDisplayPreferences();
   renderManifest();
   renderLedger();
   renderPrintLedgerPages();
@@ -790,6 +801,10 @@ function renderLedgerMode() {
   ledgerModeToggle.querySelectorAll("[data-ledger-mode]").forEach((button) => {
     button.classList.toggle("is-selected", button.dataset.ledgerMode === state.ledgerInteractionMode);
   });
+}
+
+function renderDisplayPreferences() {
+  hideZeroValuesToggle.checked = state.hideZeroValues;
 }
 
 function createEntryCard(entry, index) {
@@ -1013,6 +1028,10 @@ function formatLedgerCell(field, value) {
     return "";
   }
 
+  if (state.hideZeroValues && SUMMABLE_FIELDS.includes(field) && toNumber(value) === 0) {
+    return "";
+  }
+
   if (field === "date") {
     return formatLedgerDate(value);
   }
@@ -1087,6 +1106,22 @@ function loadSelectedSumIds(entries) {
   }
 }
 
+function loadDisplayPreferences() {
+  try {
+    const raw = localStorage.getItem(DISPLAY_PREFERENCES_KEY);
+    if (!raw) {
+      return { hideZeroValues: false };
+    }
+
+    const parsed = JSON.parse(raw);
+    return {
+      hideZeroValues: Boolean(parsed?.hideZeroValues),
+    };
+  } catch (error) {
+    return { hideZeroValues: false };
+  }
+}
+
 function persistEntries() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.entries));
 }
@@ -1097,6 +1132,15 @@ function persistSelectedSumIds() {
     .filter((entryId) => state.selectedSumIds.has(entryId));
 
   localStorage.setItem(SUM_SELECTION_KEY, JSON.stringify(orderedSelection));
+}
+
+function persistDisplayPreferences() {
+  localStorage.setItem(
+    DISPLAY_PREFERENCES_KEY,
+    JSON.stringify({
+      hideZeroValues: state.hideZeroValues,
+    })
+  );
 }
 
 function getSelectedEntries() {
