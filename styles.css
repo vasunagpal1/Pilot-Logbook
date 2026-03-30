@@ -138,6 +138,12 @@ body::before {
   text-transform: uppercase;
 }
 
+.hero-metrics {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
 .hero-cards {
   border-radius: var(--radius-lg);
   padding: 14px;
@@ -145,6 +151,12 @@ body::before {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
   align-content: start;
+}
+
+.hero-substats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .stat-card {
@@ -174,6 +186,14 @@ body::before {
 .stat-value.small {
   font-size: 0.96rem;
   line-height: 1.2;
+}
+
+.stat-card--compact {
+  padding: 10px 12px 9px;
+}
+
+.stat-value--compact {
+  font-size: clamp(1rem, 1.2vw, 1.28rem);
 }
 
 .app-shell {
@@ -1070,6 +1090,10 @@ body::before {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .hero-substats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .entry-zone {
     grid-template-columns: minmax(0, 1.3fr) minmax(300px, 0.9fr);
   }
@@ -1117,6 +1141,7 @@ body::before {
   }
 
   .hero-cards,
+  .hero-substats,
   .form-grid--four,
   .matrix-grid,
   .form-grid--three,

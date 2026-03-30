@@ -138,6 +138,12 @@ const emptyState = document.querySelector("#empty-state");
 const entryCount = document.querySelector("#entry-count");
 const flightHours = document.querySelector("#flight-hours");
 const landingCount = document.querySelector("#landing-count");
+const summaryIfActual = document.querySelector("#summary-if-actual");
+const summaryFstd = document.querySelector("#summary-fstd");
+const summarySeDual = document.querySelector("#summary-se-dual");
+const summaryPicDay = document.querySelector("#summary-pic-day");
+const summaryPicNight = document.querySelector("#summary-pic-night");
+const summaryMeDual = document.querySelector("#summary-me-dual");
 const sumStatus = document.querySelector("#sum-status");
 const sumConsole = document.querySelector(".sum-console");
 const bulkStatus = document.querySelector("#bulk-status");
@@ -727,10 +733,36 @@ function renderSummary() {
     (sum, entry) => sum + toNumber(entry.landingsDay) + toNumber(entry.landingsNight),
     0
   );
+  const totals = state.entries.reduce(
+    (summary, entry) => {
+      summary.ifActual += toNumber(entry.instrumentActual);
+      summary.fstd +=
+        toNumber(entry.instrumentFstd) + toNumber(entry.fstdPrimary) + toNumber(entry.fstdSecondary);
+      summary.seDual += toNumber(entry.seDayDual) + toNumber(entry.seNightDual);
+      summary.picDay += toNumber(entry.seDayPic) + toNumber(entry.meDayPic);
+      summary.picNight += toNumber(entry.seNightPic) + toNumber(entry.meNightPic);
+      summary.meDual += toNumber(entry.meDayDual) + toNumber(entry.meNightDual);
+      return summary;
+    },
+    {
+      ifActual: 0,
+      fstd: 0,
+      seDual: 0,
+      picDay: 0,
+      picNight: 0,
+      meDual: 0,
+    }
+  );
 
   entryCount.textContent = String(state.entries.length);
   flightHours.textContent = formatTotal(totalHours);
   landingCount.textContent = String(totalLandings);
+  summaryIfActual.textContent = formatTotal(totals.ifActual);
+  summaryFstd.textContent = formatTotal(totals.fstd);
+  summarySeDual.textContent = formatTotal(totals.seDual);
+  summaryPicDay.textContent = formatTotal(totals.picDay);
+  summaryPicNight.textContent = formatTotal(totals.picNight);
+  summaryMeDual.textContent = formatTotal(totals.meDual);
 }
 
 function renderManifest() {
