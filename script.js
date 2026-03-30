@@ -121,6 +121,7 @@ const entryFormScroll = document.querySelector("#entry-form-scroll");
 const saveButton = document.querySelector("#save-button");
 const splitEntryButton = document.querySelector("#split-entry");
 const cancelSplitButton = document.querySelector("#cancel-split");
+const deleteEntryButton = document.querySelector("#delete-entry");
 const resetFormButton = document.querySelector("#reset-form");
 const printButton = document.querySelector("#print-ledger");
 const formTitle = document.querySelector("#form-title");
@@ -163,6 +164,7 @@ function bindEvents() {
   form.addEventListener("submit", handleSaveEntry);
   splitEntryButton.addEventListener("click", () => startSplitEntry());
   cancelSplitButton.addEventListener("click", cancelSplitEntry);
+  deleteEntryButton.addEventListener("click", handleEditorDelete);
   resetFormButton.addEventListener("click", clearEditor);
   printButton.addEventListener("click", () => window.print());
 
@@ -403,6 +405,14 @@ function deleteEntry(entryId) {
   persistEntries();
   persistSelectedSumIds();
   render();
+}
+
+function handleEditorDelete() {
+  if (!state.editingId) {
+    return;
+  }
+
+  deleteEntry(state.editingId);
 }
 
 function moveEntry(entryId, direction) {
@@ -780,6 +790,7 @@ function renderEditorMode() {
   splitPanel.hidden = !isSplitMode;
   splitEntryButton.hidden = !isEditMode || isSplitMode;
   cancelSplitButton.hidden = !isSplitMode;
+  deleteEntryButton.hidden = !isEditMode || isSplitMode;
 
   if (isSplitMode) {
     formTitle.textContent = "Split flight entry";
