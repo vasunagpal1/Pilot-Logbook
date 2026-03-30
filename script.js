@@ -98,11 +98,14 @@ const state = {
   selectedSumIds: new Set(loadSelectedSumIds(initialEntries)),
   selectedDeleteIds: new Set(),
   editingId: null,
+  ledgerInteractionMode: "edit",
   dragId: null,
   dragPosition: null,
 };
 
 const form = document.querySelector("#entry-form");
+const entryStage = document.querySelector(".entry-stage");
+const entryFormScroll = document.querySelector("#entry-form-scroll");
 const saveButton = document.querySelector("#save-button");
 const resetFormButton = document.querySelector("#reset-form");
 const printButton = document.querySelector("#print-ledger");
@@ -121,6 +124,8 @@ const sumStatus = document.querySelector("#sum-status");
 const sumConsole = document.querySelector(".sum-console");
 const bulkStatus = document.querySelector("#bulk-status");
 const bulkConsole = document.querySelector(".bulk-console");
+const ledgerModeStatus = document.querySelector("#ledger-mode-status");
+const ledgerModeToggle = document.querySelector(".ledger-mode-toggle");
 const deleteSelectedButton = document.querySelector("#delete-selected");
 const deleteAllButton = document.querySelector("#delete-all");
 const ledgerColgroupMarkup = ledgerTable.querySelector("colgroup").outerHTML;
@@ -147,10 +152,16 @@ function bindEvents() {
   entryList.addEventListener("dragend", clearDragMarkers);
   sumConsole.addEventListener("click", handleSumConsoleAction);
   bulkConsole.addEventListener("click", handleBulkConsoleAction);
+  ledgerModeToggle.addEventListener("click", handleLedgerModeAction);
 
   ledgerBody.addEventListener("click", (event) => {
-    const row = event.target.closest("[data-entry-id]");
+    const row = event.target.closest(".filled-row[data-entry-id]");
     if (!row) {
+      return;
+    }
+
+    if (state.ledgerInteractionMode === "select") {
+      toggleBulkSelection(row.dataset.entryId, undefined, { preserveLedgerView: true });
       return;
     }
 
@@ -166,9 +177,11 @@ function handleSaveEntry(event) {
     return;
   }
 
-  if (state.editingId) {
+  const entryIdToReveal = state.editingId;
+
+  if (entryIdToReveal) {
     state.entries = state.entries.map((item) =>
-      item.id === state.editingId ? { ...item, ...entry, updatedAt: new Date().toISOString() } : item
+      item.id === entryIdToReveal ? { ...item, ...entry, updatedAt: new Date().toISOString() } : item
     );
   } else {
     const newEntry = {
@@ -184,8 +197,12 @@ function handleSaveEntry(event) {
 
   persistEntries();
   persistSelectedSumIds();
+  resetEditorState();
   render();
-  clearEditor({ preserveMessage: false });
+
+  if (entryIdToReveal) {
+    revealLedgerEntry(entryIdToReveal);
+  }
 }
 
 function readFormEntry() {
@@ -217,6 +234,11 @@ function normalizeField(field, rawValue) {
 }
 
 function clearEditor(options = {}) {
+  resetEditorState(options);
+  render();
+}
+
+function resetEditorState(options = {}) {
   form.reset();
   state.editingId = null;
   saveButton.textContent = "Save entry";
@@ -225,7 +247,6 @@ function clearEditor(options = {}) {
     ? formStatus.textContent
     : "New entries are saved to this browser automatically.";
   seedDefaultDate();
-  render();
 }
 
 function seedDefaultDate() {
@@ -254,7 +275,7 @@ function editEntry(entryId) {
   formTitle.textContent = "Edit flight entry";
   formStatus.textContent = "Editing an existing row. Save to update the ledger in place.";
   render();
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  scrollEditorIntoView();
 }
 
 function handleEntryCardAction(event) {
@@ -330,7 +351,7 @@ function deleteEntry(entryId) {
   state.selectedSumIds.delete(entryId);
   state.selectedDeleteIds.delete(entryId);
   if (state.editingId === entryId) {
-    clearEditor({ preserveMessage: true });
+    resetEditorState({ preserveMessage: true });
   }
   persistEntries();
   persistSelectedSumIds();
@@ -465,6 +486,16 @@ function handleBulkConsoleAction(event) {
   }
 }
 
+function handleLedgerModeAction(event) {
+  const button = event.target.closest("[data-ledger-mode]");
+  if (!button) {
+    return;
+  }
+
+  state.ledgerInteractionMode = button.dataset.ledgerMode === "select" ? "select" : "edit";
+  renderLedgerMode();
+}
+
 function deleteSelectedEntries() {
   const selectedEntries = state.entries.filter((entry) => state.selectedDeleteIds.has(entry.id));
   if (!selectedEntries.length) {
@@ -488,12 +519,7 @@ function deleteSelectedEntries() {
   );
 
   if (state.editingId && selectedIds.has(state.editingId)) {
-    form.reset();
-    state.editingId = null;
-    saveButton.textContent = "Save entry";
-    formTitle.textContent = "Add a flight entry";
-    formStatus.textContent = "New entries are saved to this browser automatically.";
-    seedDefaultDate();
+    resetEditorState();
   }
 
   persistEntries();
@@ -513,12 +539,7 @@ function deleteAllEntries() {
   state.entries = [];
   state.selectedDeleteIds = new Set();
   state.selectedSumIds = new Set();
-  form.reset();
-  state.editingId = null;
-  saveButton.textContent = "Save entry";
-  formTitle.textContent = "Add a flight entry";
-  formStatus.textContent = "New entries are saved to this browser automatically.";
-  seedDefaultDate();
+  resetEditorState();
 
   persistEntries();
   persistSelectedSumIds();
@@ -544,6 +565,7 @@ function render() {
   renderSummary();
   renderSumConsole();
   renderBulkConsole();
+  renderLedgerMode();
   renderManifest();
   renderLedger();
   renderPrintLedgerPages();
@@ -609,6 +631,21 @@ function renderSumConsole() {
   }
 
   sumStatus.textContent = `Manual sum is using ${selectedRows} of ${totalRows} saved rows.`;
+}
+
+function renderLedgerMode() {
+  if (!ledgerModeToggle || !ledgerModeStatus) {
+    return;
+  }
+
+  const isSelectMode = state.ledgerInteractionMode === "select";
+  ledgerModeStatus.textContent = isSelectMode
+    ? "Select mode is on. Click filled ledger rows to add or remove them from bulk delete."
+    : "Edit mode is on. Click a filled row to edit it, or switch to Select rows to choose entries from the table.";
+
+  ledgerModeToggle.querySelectorAll("[data-ledger-mode]").forEach((button) => {
+    button.classList.toggle("is-selected", button.dataset.ledgerMode === state.ledgerInteractionMode);
+  });
 }
 
 function createEntryCard(entry, index) {
@@ -691,7 +728,7 @@ function createLedgerRow(entry) {
   }).join("");
 
   return `
-    <tr class="filled-row ${entry.id === state.editingId ? "is-active" : ""} ${state.selectedSumIds.has(entry.id) ? "is-in-sum" : ""}" data-entry-id="${entry.id}">
+    <tr class="filled-row ${entry.id === state.editingId ? "is-active" : ""} ${state.selectedSumIds.has(entry.id) ? "is-in-sum" : ""} ${state.selectedDeleteIds.has(entry.id) ? "is-bulk-selected" : ""}" data-entry-id="${entry.id}">
       ${cells}
     </tr>
   `;
@@ -891,7 +928,8 @@ function getSelectedEntries() {
   return state.entries.filter((entry) => state.selectedSumIds.has(entry.id));
 }
 
-function toggleBulkSelection(entryId, forceState) {
+function toggleBulkSelection(entryId, forceState, options = {}) {
+  const ledgerView = options.preserveLedgerView ? captureLedgerView() : null;
   const shouldSelect =
     typeof forceState === "boolean" ? forceState : !state.selectedDeleteIds.has(entryId);
 
@@ -902,6 +940,10 @@ function toggleBulkSelection(entryId, forceState) {
   }
 
   render();
+
+  if (ledgerView) {
+    restoreLedgerView(ledgerView);
+  }
 }
 
 function toggleSumSelection(entryId) {
@@ -913,6 +955,43 @@ function toggleSumSelection(entryId) {
 
   persistSelectedSumIds();
   render();
+}
+
+function scrollEditorIntoView() {
+  entryStage?.scrollIntoView({ behavior: "smooth", block: "start" });
+  entryFormScroll?.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function revealLedgerEntry(entryId) {
+  requestAnimationFrame(() => {
+    const row = ledgerBody.querySelector(`[data-entry-id="${entryId}"]`);
+    if (!row) {
+      return;
+    }
+
+    row.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+    row.classList.add("is-spotlight");
+    window.setTimeout(() => row.classList.remove("is-spotlight"), 1800);
+  });
+}
+
+function captureLedgerView() {
+  const scroller = document.querySelector(".ledger-stage .table-scroller");
+  return {
+    scrollLeft: scroller?.scrollLeft ?? 0,
+    scrollTop: window.scrollY,
+  };
+}
+
+function restoreLedgerView(view) {
+  requestAnimationFrame(() => {
+    const scroller = document.querySelector(".ledger-stage .table-scroller");
+    if (scroller) {
+      scroller.scrollLeft = view.scrollLeft;
+    }
+
+    window.scrollTo({ top: view.scrollTop });
+  });
 }
 
 function createId() {

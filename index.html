@@ -57,217 +57,219 @@
               </p>
             </div>
 
-            <form id="entry-form" class="entry-form" autocomplete="off">
-              <section class="form-section">
-                <div class="section-header">
-                  <h3>Core details</h3>
-                  <p>Columns 1 to 5</p>
+            <div class="panel-scroll panel-scroll--form" id="entry-form-scroll">
+              <form id="entry-form" class="entry-form" autocomplete="off">
+                <section class="form-section">
+                  <div class="section-header">
+                    <h3>Core details</h3>
+                    <p>Columns 1 to 5</p>
+                  </div>
+                  <div class="form-grid form-grid--two">
+                    <label class="field">
+                      <span>Date</span>
+                      <input type="date" name="date" required />
+                    </label>
+                    <label class="field">
+                      <span>Type</span>
+                      <input type="text" name="type" placeholder="C152 / FNPT-II" required />
+                    </label>
+                    <label class="field">
+                      <span>Registration</span>
+                      <input type="text" name="registration" placeholder="ZS-ABC" required />
+                    </label>
+                    <label class="field">
+                      <span>Pilot in command</span>
+                      <input type="text" name="pilotInCommand" placeholder="W. Kowour / SELF" required />
+                    </label>
+                  </div>
+                  <label class="field">
+                    <span>Details of flight and remarks</span>
+                    <textarea
+                      name="flightDetails"
+                      rows="3"
+                      placeholder="Sector, route, procedures, nav exercise, altitude, or training notes"
+                    ></textarea>
+                  </label>
+                </section>
+
+                <section class="form-section">
+                  <div class="section-header">
+                    <h3>Instrument and instruction</h3>
+                    <p>Columns 6 to 13</p>
+                  </div>
+                  <div class="form-grid form-grid--four">
+                    <label class="field">
+                      <span>NavAids</span>
+                      <input type="text" name="navaids" placeholder="ILS / VOR / ADF" />
+                    </label>
+                    <label class="field">
+                      <span>Instrument place</span>
+                      <input type="text" name="instrumentPlace" placeholder="FALA / FNAB" />
+                    </label>
+                    <label class="field">
+                      <span>Instrument actual</span>
+                      <input type="number" name="instrumentActual" min="0" step="0.1" placeholder="1.4" />
+                    </label>
+                    <label class="field">
+                      <span>Instrument FSTD</span>
+                      <input type="number" name="instrumentFstd" min="0" step="0.1" placeholder="1.3" />
+                    </label>
+                    <label class="field">
+                      <span>Instructor SE</span>
+                      <input type="number" name="instructorSE" min="0" step="0.1" placeholder="0.8" />
+                    </label>
+                    <label class="field">
+                      <span>Instructor ME</span>
+                      <input type="number" name="instructorME" min="0" step="0.1" placeholder="0.4" />
+                    </label>
+                    <label class="field">
+                      <span>FSTD 1</span>
+                      <input type="number" name="fstdPrimary" min="0" step="0.1" placeholder="1.0" />
+                    </label>
+                    <label class="field">
+                      <span>FSTD 2</span>
+                      <input type="number" name="fstdSecondary" min="0" step="0.1" placeholder="1.0" />
+                    </label>
+                  </div>
+                </section>
+
+                <section class="form-section">
+                  <div class="section-header">
+                    <h3>Aircraft time</h3>
+                    <p>Columns 14 to 31</p>
+                  </div>
+
+                  <div class="matrix-grid">
+                    <article class="matrix-card">
+                      <div class="matrix-title">
+                        <h4>Single-engine day</h4>
+                        <p>Cols 14 to 17</p>
+                      </div>
+                      <div class="form-grid form-grid--two">
+                        <label class="field">
+                          <span>Dual</span>
+                          <input type="number" name="seDayDual" min="0" step="0.1" placeholder="0.0" />
+                        </label>
+                        <label class="field">
+                          <span>PIC</span>
+                          <input type="number" name="seDayPic" min="0" step="0.1" placeholder="0.0" />
+                        </label>
+                        <label class="field">
+                          <span>PICUS</span>
+                          <input type="number" name="seDayPicus" min="0" step="0.1" placeholder="0.0" />
+                        </label>
+                        <label class="field">
+                          <span>Copilot</span>
+                          <input type="number" name="seDayCopilot" min="0" step="0.1" placeholder="0.0" />
+                        </label>
+                      </div>
+                    </article>
+
+                    <article class="matrix-card">
+                      <div class="matrix-title">
+                        <h4>Single-engine night</h4>
+                        <p>Cols 18 to 21</p>
+                      </div>
+                      <div class="form-grid form-grid--two">
+                        <label class="field">
+                          <span>Dual</span>
+                          <input type="number" name="seNightDual" min="0" step="0.1" placeholder="0.0" />
+                        </label>
+                        <label class="field">
+                          <span>PIC</span>
+                          <input type="number" name="seNightPic" min="0" step="0.1" placeholder="0.0" />
+                        </label>
+                        <label class="field">
+                          <span>PICUS</span>
+                          <input type="number" name="seNightPicus" min="0" step="0.1" placeholder="0.0" />
+                        </label>
+                        <label class="field">
+                          <span>Copilot</span>
+                          <input type="number" name="seNightCopilot" min="0" step="0.1" placeholder="0.0" />
+                        </label>
+                      </div>
+                    </article>
+
+                    <article class="matrix-card">
+                      <div class="matrix-title">
+                        <h4>Multi-engine day</h4>
+                        <p>Cols 22 to 25</p>
+                      </div>
+                      <div class="form-grid form-grid--two">
+                        <label class="field">
+                          <span>Dual</span>
+                          <input type="number" name="meDayDual" min="0" step="0.1" placeholder="0.0" />
+                        </label>
+                        <label class="field">
+                          <span>PIC</span>
+                          <input type="number" name="meDayPic" min="0" step="0.1" placeholder="0.0" />
+                        </label>
+                        <label class="field">
+                          <span>PICUS</span>
+                          <input type="number" name="meDayPicus" min="0" step="0.1" placeholder="0.0" />
+                        </label>
+                        <label class="field">
+                          <span>Copilot</span>
+                          <input type="number" name="meDayCopilot" min="0" step="0.1" placeholder="0.0" />
+                        </label>
+                      </div>
+                    </article>
+
+                    <article class="matrix-card">
+                      <div class="matrix-title">
+                        <h4>Multi-engine night</h4>
+                        <p>Cols 26 to 29</p>
+                      </div>
+                      <div class="form-grid form-grid--two">
+                        <label class="field">
+                          <span>Dual</span>
+                          <input type="number" name="meNightDual" min="0" step="0.1" placeholder="0.0" />
+                        </label>
+                        <label class="field">
+                          <span>PIC</span>
+                          <input type="number" name="meNightPic" min="0" step="0.1" placeholder="0.0" />
+                        </label>
+                        <label class="field">
+                          <span>PICUS</span>
+                          <input type="number" name="meNightPicus" min="0" step="0.1" placeholder="0.0" />
+                        </label>
+                        <label class="field">
+                          <span>Copilot</span>
+                          <input type="number" name="meNightCopilot" min="0" step="0.1" placeholder="0.0" />
+                        </label>
+                      </div>
+                    </article>
+                  </div>
+
+                  <div class="form-grid form-grid--three">
+                    <label class="field">
+                      <span>Landings day</span>
+                      <input type="number" name="landingsDay" min="0" step="1" placeholder="1" />
+                    </label>
+                    <label class="field">
+                      <span>Landings night</span>
+                      <input type="number" name="landingsNight" min="0" step="1" placeholder="0" />
+                    </label>
+                    <label class="field field--stretch">
+                      <span>Remarks</span>
+                      <input type="text" name="remarks" placeholder="Extra notes, airports, checks, or carry-forward notes" />
+                    </label>
+                  </div>
+                </section>
+
+                <div class="form-actions">
+                  <button type="submit" class="button button-primary" id="save-button">
+                    Save entry
+                  </button>
+                  <button type="button" class="button button-ghost" id="reset-form">
+                    Clear form
+                  </button>
+                  <button type="button" class="button button-ghost" id="print-ledger">
+                    Print sheet
+                  </button>
                 </div>
-                <div class="form-grid form-grid--two">
-                  <label class="field">
-                    <span>Date</span>
-                    <input type="date" name="date" required />
-                  </label>
-                  <label class="field">
-                    <span>Type</span>
-                    <input type="text" name="type" placeholder="C152 / FNPT-II" required />
-                  </label>
-                  <label class="field">
-                    <span>Registration</span>
-                    <input type="text" name="registration" placeholder="ZS-ABC" required />
-                  </label>
-                  <label class="field">
-                    <span>Pilot in command</span>
-                    <input type="text" name="pilotInCommand" placeholder="W. Kowour / SELF" required />
-                  </label>
-                </div>
-                <label class="field">
-                  <span>Details of flight and remarks</span>
-                  <textarea
-                    name="flightDetails"
-                    rows="3"
-                    placeholder="Sector, route, procedures, nav exercise, altitude, or training notes"
-                  ></textarea>
-                </label>
-              </section>
-
-              <section class="form-section">
-                <div class="section-header">
-                  <h3>Instrument and instruction</h3>
-                  <p>Columns 6 to 13</p>
-                </div>
-                <div class="form-grid form-grid--four">
-                  <label class="field">
-                    <span>NavAids</span>
-                    <input type="text" name="navaids" placeholder="ILS / VOR / ADF" />
-                  </label>
-                  <label class="field">
-                    <span>Instrument place</span>
-                    <input type="text" name="instrumentPlace" placeholder="FALA / FNAB" />
-                  </label>
-                  <label class="field">
-                    <span>Instrument actual</span>
-                    <input type="number" name="instrumentActual" min="0" step="0.1" placeholder="1.4" />
-                  </label>
-                  <label class="field">
-                    <span>Instrument FSTD</span>
-                    <input type="number" name="instrumentFstd" min="0" step="0.1" placeholder="1.3" />
-                  </label>
-                  <label class="field">
-                    <span>Instructor SE</span>
-                    <input type="number" name="instructorSE" min="0" step="0.1" placeholder="0.8" />
-                  </label>
-                  <label class="field">
-                    <span>Instructor ME</span>
-                    <input type="number" name="instructorME" min="0" step="0.1" placeholder="0.4" />
-                  </label>
-                  <label class="field">
-                    <span>FSTD 1</span>
-                    <input type="number" name="fstdPrimary" min="0" step="0.1" placeholder="1.0" />
-                  </label>
-                  <label class="field">
-                    <span>FSTD 2</span>
-                    <input type="number" name="fstdSecondary" min="0" step="0.1" placeholder="1.0" />
-                  </label>
-                </div>
-              </section>
-
-              <section class="form-section">
-                <div class="section-header">
-                  <h3>Aircraft time</h3>
-                  <p>Columns 14 to 31</p>
-                </div>
-
-                <div class="matrix-grid">
-                  <article class="matrix-card">
-                    <div class="matrix-title">
-                      <h4>Single-engine day</h4>
-                      <p>Cols 14 to 17</p>
-                    </div>
-                    <div class="form-grid form-grid--two">
-                      <label class="field">
-                        <span>Dual</span>
-                        <input type="number" name="seDayDual" min="0" step="0.1" placeholder="0.0" />
-                      </label>
-                      <label class="field">
-                        <span>PIC</span>
-                        <input type="number" name="seDayPic" min="0" step="0.1" placeholder="0.0" />
-                      </label>
-                      <label class="field">
-                        <span>PICUS</span>
-                        <input type="number" name="seDayPicus" min="0" step="0.1" placeholder="0.0" />
-                      </label>
-                      <label class="field">
-                        <span>Copilot</span>
-                        <input type="number" name="seDayCopilot" min="0" step="0.1" placeholder="0.0" />
-                      </label>
-                    </div>
-                  </article>
-
-                  <article class="matrix-card">
-                    <div class="matrix-title">
-                      <h4>Single-engine night</h4>
-                      <p>Cols 18 to 21</p>
-                    </div>
-                    <div class="form-grid form-grid--two">
-                      <label class="field">
-                        <span>Dual</span>
-                        <input type="number" name="seNightDual" min="0" step="0.1" placeholder="0.0" />
-                      </label>
-                      <label class="field">
-                        <span>PIC</span>
-                        <input type="number" name="seNightPic" min="0" step="0.1" placeholder="0.0" />
-                      </label>
-                      <label class="field">
-                        <span>PICUS</span>
-                        <input type="number" name="seNightPicus" min="0" step="0.1" placeholder="0.0" />
-                      </label>
-                      <label class="field">
-                        <span>Copilot</span>
-                        <input type="number" name="seNightCopilot" min="0" step="0.1" placeholder="0.0" />
-                      </label>
-                    </div>
-                  </article>
-
-                  <article class="matrix-card">
-                    <div class="matrix-title">
-                      <h4>Multi-engine day</h4>
-                      <p>Cols 22 to 25</p>
-                    </div>
-                    <div class="form-grid form-grid--two">
-                      <label class="field">
-                        <span>Dual</span>
-                        <input type="number" name="meDayDual" min="0" step="0.1" placeholder="0.0" />
-                      </label>
-                      <label class="field">
-                        <span>PIC</span>
-                        <input type="number" name="meDayPic" min="0" step="0.1" placeholder="0.0" />
-                      </label>
-                      <label class="field">
-                        <span>PICUS</span>
-                        <input type="number" name="meDayPicus" min="0" step="0.1" placeholder="0.0" />
-                      </label>
-                      <label class="field">
-                        <span>Copilot</span>
-                        <input type="number" name="meDayCopilot" min="0" step="0.1" placeholder="0.0" />
-                      </label>
-                    </div>
-                  </article>
-
-                  <article class="matrix-card">
-                    <div class="matrix-title">
-                      <h4>Multi-engine night</h4>
-                      <p>Cols 26 to 29</p>
-                    </div>
-                    <div class="form-grid form-grid--two">
-                      <label class="field">
-                        <span>Dual</span>
-                        <input type="number" name="meNightDual" min="0" step="0.1" placeholder="0.0" />
-                      </label>
-                      <label class="field">
-                        <span>PIC</span>
-                        <input type="number" name="meNightPic" min="0" step="0.1" placeholder="0.0" />
-                      </label>
-                      <label class="field">
-                        <span>PICUS</span>
-                        <input type="number" name="meNightPicus" min="0" step="0.1" placeholder="0.0" />
-                      </label>
-                      <label class="field">
-                        <span>Copilot</span>
-                        <input type="number" name="meNightCopilot" min="0" step="0.1" placeholder="0.0" />
-                      </label>
-                    </div>
-                  </article>
-                </div>
-
-                <div class="form-grid form-grid--three">
-                  <label class="field">
-                    <span>Landings day</span>
-                    <input type="number" name="landingsDay" min="0" step="1" placeholder="1" />
-                  </label>
-                  <label class="field">
-                    <span>Landings night</span>
-                    <input type="number" name="landingsNight" min="0" step="1" placeholder="0" />
-                  </label>
-                  <label class="field field--stretch">
-                    <span>Remarks</span>
-                    <input type="text" name="remarks" placeholder="Extra notes, airports, checks, or carry-forward notes" />
-                  </label>
-                </div>
-              </section>
-
-              <div class="form-actions">
-                <button type="submit" class="button button-primary" id="save-button">
-                  Save entry
-                </button>
-                <button type="button" class="button button-ghost" id="reset-form">
-                  Clear form
-                </button>
-                <button type="button" class="button button-ghost" id="print-ledger">
-                  Print sheet
-                </button>
-              </div>
-            </form>
+              </form>
+            </div>
           </section>
 
           <section class="panel panel-manifest">
@@ -279,52 +281,54 @@
               <p class="panel-status">Drag cards to reorder the printed ledger rows.</p>
             </div>
 
-            <div class="sum-console">
-              <div>
-                <p class="sum-console__label">Sum control</p>
-                <p id="sum-status" class="sum-console__status">
-                  Default totals include every saved row.
-                </p>
+            <div class="panel-scroll panel-scroll--manifest">
+              <div class="sum-console">
+                <div>
+                  <p class="sum-console__label">Sum control</p>
+                  <p id="sum-status" class="sum-console__status">
+                    Default totals include every saved row.
+                  </p>
+                </div>
+                <div class="sum-console__actions">
+                  <button type="button" class="mini-button" data-sum-action="select-all">
+                    Select all
+                  </button>
+                  <button type="button" class="mini-button" data-sum-action="clear">
+                    Clear
+                  </button>
+                </div>
               </div>
-              <div class="sum-console__actions">
-                <button type="button" class="mini-button" data-sum-action="select-all">
-                  Select all
-                </button>
-                <button type="button" class="mini-button" data-sum-action="clear">
-                  Clear
-                </button>
-              </div>
-            </div>
 
-            <div class="bulk-console">
-              <div>
-                <p class="bulk-console__label">Bulk actions</p>
-                <p id="bulk-status" class="bulk-console__status">
-                  Select entries and delete them together.
-                </p>
+              <div class="bulk-console">
+                <div>
+                  <p class="bulk-console__label">Bulk actions</p>
+                  <p id="bulk-status" class="bulk-console__status">
+                    Select entries and delete them together.
+                  </p>
+                </div>
+                <div class="bulk-console__actions">
+                  <button type="button" class="mini-button" data-bulk-action="select-all">
+                    Select all entries
+                  </button>
+                  <button type="button" class="mini-button" data-bulk-action="clear">
+                    Clear selection
+                  </button>
+                  <button type="button" class="mini-button mini-button-danger" id="delete-selected" data-bulk-action="delete-selected">
+                    Delete selected
+                  </button>
+                  <button type="button" class="mini-button mini-button-danger" id="delete-all" data-bulk-action="delete-all">
+                    Delete all entries
+                  </button>
+                </div>
               </div>
-              <div class="bulk-console__actions">
-                <button type="button" class="mini-button" data-bulk-action="select-all">
-                  Select all entries
-                </button>
-                <button type="button" class="mini-button" data-bulk-action="clear">
-                  Clear selection
-                </button>
-                <button type="button" class="mini-button mini-button-danger" id="delete-selected" data-bulk-action="delete-selected">
-                  Delete selected
-                </button>
-                <button type="button" class="mini-button mini-button-danger" id="delete-all" data-bulk-action="delete-all">
-                  Delete all entries
-                </button>
+
+              <div id="empty-state" class="empty-state">
+                <p>No flights saved yet.</p>
+                <span>Add your first entry and it will appear here and on the sheet.</span>
               </div>
-            </div>
 
-            <div id="empty-state" class="empty-state">
-              <p>No flights saved yet.</p>
-              <span>Add your first entry and it will appear here and on the sheet.</span>
+              <ul id="entry-list" class="entry-list" aria-label="Saved entries"></ul>
             </div>
-
-            <ul id="entry-list" class="entry-list" aria-label="Saved entries"></ul>
           </section>
         </div>
       </section>
@@ -336,9 +340,19 @@
               <p class="panel-kicker">Presentation View</p>
               <h2>Paper logbook, digitally polished</h2>
             </div>
-            <p class="panel-status">
-              Click a filled row to edit it. Rows included in the manual sum glow softly on the sheet.
-            </p>
+            <div class="ledger-tools">
+              <p id="ledger-mode-status" class="panel-status">
+                Edit mode is on. Click a filled row to edit it, or switch to Select rows to choose entries from the table.
+              </p>
+              <div class="ledger-mode-toggle" role="group" aria-label="Ledger row click mode">
+                <button type="button" class="mini-button is-selected" data-ledger-mode="edit">
+                  Edit rows
+                </button>
+                <button type="button" class="mini-button" data-ledger-mode="select">
+                  Select rows
+                </button>
+              </div>
+            </div>
           </div>
 
           <div class="paper-frame">
