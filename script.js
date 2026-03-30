@@ -1,7 +1,9 @@
 const STORAGE_KEY = "pilot-logbook-atelier-v1";
 const SUM_SELECTION_KEY = "pilot-logbook-atelier-sum-selection-v1";
+const SPLIT_FIELD_PREFIX = "split__";
 const PRINT_PAGE_ENTRY_LIMIT = 18;
 const PRINT_PAGE_MIN_BLANK_ROWS = 6;
+const REQUIRED_FIELDS = ["date", "type", "registration", "pilotInCommand"];
 
 const TIME_FIELDS = [
   "seDayDual",
@@ -98,6 +100,7 @@ const state = {
   selectedSumIds: new Set(loadSelectedSumIds(initialEntries)),
   selectedDeleteIds: new Set(),
   editingId: null,
+  splitSourceId: null,
   ledgerInteractionMode: "edit",
   dragId: null,
   dragPosition: null,
@@ -107,10 +110,14 @@ const form = document.querySelector("#entry-form");
 const entryStage = document.querySelector(".entry-stage");
 const entryFormScroll = document.querySelector("#entry-form-scroll");
 const saveButton = document.querySelector("#save-button");
+const splitEntryButton = document.querySelector("#split-entry");
+const cancelSplitButton = document.querySelector("#cancel-split");
 const resetFormButton = document.querySelector("#reset-form");
 const printButton = document.querySelector("#print-ledger");
 const formTitle = document.querySelector("#form-title");
 const formStatus = document.querySelector("#form-status");
+const splitPanel = document.querySelector("#split-panel");
+const splitFormFields = document.querySelector("#split-form-fields");
 const ledgerBody = document.querySelector("#ledger-body");
 const ledgerFooter = document.querySelector("#ledger-footer");
 const ledgerTable = document.querySelector("#logbook-table");
@@ -134,6 +141,7 @@ const ledgerHeadMarkup = ledgerTable.querySelector("thead").outerHTML;
 boot();
 
 function boot() {
+  buildSplitEditor();
   bindEvents();
   seedDefaultDate();
   render();
@@ -141,6 +149,8 @@ function boot() {
 
 function bindEvents() {
   form.addEventListener("submit", handleSaveEntry);
+  splitEntryButton.addEventListener("click", () => startSplitEntry());
+  cancelSplitButton.addEventListener("click", cancelSplitEntry);
   resetFormButton.addEventListener("click", clearEditor);
   printButton.addEventListener("click", () => window.print());
 
@@ -173,11 +183,24 @@ function handleSaveEntry(event) {
   event.preventDefault();
 
   const entry = readFormEntry();
-  if (!entry.date || !entry.type || !entry.registration || !entry.pilotInCommand) {
+  if (!isEntryValid(entry)) {
+    formStatus.textContent = "Complete Date, Type, Registration, and Pilot in command before saving.";
     return;
   }
 
   const entryIdToReveal = state.editingId;
+
+  if (state.splitSourceId) {
+    const splitEntry = readFormEntry(SPLIT_FIELD_PREFIX);
+    if (!isEntryValid(splitEntry)) {
+      formStatus.textContent =
+        "Complete Date, Type, Registration, and Pilot in command in both split entries.";
+      return;
+    }
+
+    saveSplitEntries(entry, splitEntry);
+    return;
+  }
 
   if (entryIdToReveal) {
     state.entries = state.entries.map((item) =>
@@ -205,11 +228,11 @@ function handleSaveEntry(event) {
   }
 }
 
-function readFormEntry() {
+function readFormEntry(prefix = "") {
   const formData = new FormData(form);
 
   return ENTRY_FIELDS.reduce((entry, field) => {
-    const rawValue = String(formData.get(field) ?? "").trim();
+    const rawValue = String(formData.get(`${prefix}${field}`) ?? "").trim();
     entry[field] = normalizeField(field, rawValue);
     return entry;
   }, {});
@@ -241,8 +264,8 @@ function clearEditor(options = {}) {
 function resetEditorState(options = {}) {
   form.reset();
   state.editingId = null;
-  saveButton.textContent = "Save entry";
-  formTitle.textContent = "Add a flight entry";
+  state.splitSourceId = null;
+  clearSplitEditorFields();
   formStatus.textContent = options.preserveMessage
     ? formStatus.textContent
     : "New entries are saved to this browser automatically.";
@@ -262,6 +285,11 @@ function editEntry(entryId) {
     return;
   }
 
+  if (state.splitSourceId && state.splitSourceId !== entryId) {
+    state.splitSourceId = null;
+    clearSplitEditorFields();
+  }
+
   state.editingId = entry.id;
   ENTRY_FIELDS.forEach((field) => {
     const input = form.elements[field];
@@ -271,8 +299,6 @@ function editEntry(entryId) {
     input.value = entry[field] ?? "";
   });
 
-  saveButton.textContent = "Update entry";
-  formTitle.textContent = "Edit flight entry";
   formStatus.textContent = "Editing an existing row. Save to update the ledger in place.";
   render();
   scrollEditorIntoView();
@@ -302,6 +328,11 @@ function handleEntryCardAction(event) {
 
   if (action === "edit") {
     editEntry(entryId);
+    return;
+  }
+
+  if (action === "split") {
+    startSplitEntry(entryId);
     return;
   }
 
@@ -496,6 +527,42 @@ function handleLedgerModeAction(event) {
   renderLedgerMode();
 }
 
+function startSplitEntry(entryId = state.editingId) {
+  const sourceId = entryId || state.editingId;
+  if (!sourceId) {
+    return;
+  }
+
+  if (state.editingId !== sourceId) {
+    editEntry(sourceId);
+  }
+
+  const sourceEntry = state.entries.find((item) => item.id === sourceId);
+  if (!sourceEntry) {
+    return;
+  }
+
+  state.splitSourceId = sourceId;
+  fillSplitEditorFields(sourceEntry);
+  formStatus.textContent =
+    "Split mode is active. Edit both entries and save them back into the original row position.";
+  render();
+  scrollEditorIntoView();
+}
+
+function cancelSplitEntry() {
+  if (!state.splitSourceId) {
+    return;
+  }
+
+  state.splitSourceId = null;
+  clearSplitEditorFields();
+  formStatus.textContent = state.editingId
+    ? "Editing an existing row. Save to update the ledger in place."
+    : "New entries are saved to this browser automatically.";
+  render();
+}
+
 function deleteSelectedEntries() {
   const selectedEntries = state.entries.filter((entry) => state.selectedDeleteIds.has(entry.id));
   if (!selectedEntries.length) {
@@ -546,6 +613,53 @@ function deleteAllEntries() {
   render();
 }
 
+function saveSplitEntries(primaryEntry, secondaryEntry) {
+  const sourceIndex = state.entries.findIndex((item) => item.id === state.splitSourceId);
+  const sourceEntry = state.entries[sourceIndex];
+  if (sourceIndex < 0 || !sourceEntry) {
+    return;
+  }
+
+  const timestamp = new Date().toISOString();
+  const secondEntryId = createId();
+  const shouldCarrySum = state.selectedSumIds.has(sourceEntry.id);
+  const shouldCarryBulk = state.selectedDeleteIds.has(sourceEntry.id);
+  const firstEntry = {
+    ...sourceEntry,
+    ...primaryEntry,
+    updatedAt: timestamp,
+  };
+  const secondEntry = {
+    ...sourceEntry,
+    ...secondaryEntry,
+    id: secondEntryId,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+
+  const reorderedEntries = [...state.entries];
+  reorderedEntries.splice(sourceIndex, 1, firstEntry, secondEntry);
+  state.entries = reorderedEntries;
+
+  if (shouldCarrySum) {
+    state.selectedSumIds.add(secondEntryId);
+  } else {
+    state.selectedSumIds.delete(secondEntryId);
+  }
+
+  if (shouldCarryBulk) {
+    state.selectedDeleteIds.add(secondEntryId);
+  } else {
+    state.selectedDeleteIds.delete(secondEntryId);
+  }
+
+  resetEditorState();
+  persistEntries();
+  persistSelectedSumIds();
+  render();
+  revealLedgerEntry(firstEntry.id);
+}
+
 function clearDragMarkers() {
   state.dragId = null;
   state.dragPosition = null;
@@ -563,6 +677,7 @@ function resetDropMarkers() {
 
 function render() {
   renderSummary();
+  renderEditorMode();
   renderSumConsole();
   renderBulkConsole();
   renderLedgerMode();
@@ -633,6 +748,30 @@ function renderSumConsole() {
   sumStatus.textContent = `Manual sum is using ${selectedRows} of ${totalRows} saved rows.`;
 }
 
+function renderEditorMode() {
+  const isSplitMode = Boolean(state.splitSourceId);
+  const isEditMode = Boolean(state.editingId);
+
+  splitPanel.hidden = !isSplitMode;
+  splitEntryButton.hidden = !isEditMode || isSplitMode;
+  cancelSplitButton.hidden = !isSplitMode;
+
+  if (isSplitMode) {
+    formTitle.textContent = "Split flight entry";
+    saveButton.textContent = "Save split entries";
+    return;
+  }
+
+  if (isEditMode) {
+    formTitle.textContent = "Edit flight entry";
+    saveButton.textContent = "Update entry";
+    return;
+  }
+
+  formTitle.textContent = "Add a flight entry";
+  saveButton.textContent = "Save entry";
+}
+
 function renderLedgerMode() {
   if (!ledgerModeToggle || !ledgerModeStatus) {
     return;
@@ -680,6 +819,7 @@ function createEntryCard(entry, index) {
       </div>
       <div class="entry-card__actions">
         <button type="button" class="mini-button" data-action="edit">Edit</button>
+        <button type="button" class="mini-button" data-action="split">Split</button>
         <button type="button" class="mini-button ${isSelectedForSum ? "is-selected" : ""}" data-action="toggle-sum">
           ${isSelectedForSum ? "Sum on" : "Use in sum"}
         </button>
@@ -833,6 +973,21 @@ function chunkEntries(entries, chunkSize) {
   return pages;
 }
 
+function buildSplitEditor() {
+  if (!splitFormFields) {
+    return;
+  }
+
+  const sections = [...form.querySelectorAll(".form-section")];
+  splitFormFields.innerHTML = sections
+    .map((section) =>
+      section.outerHTML
+        .replace(/name="([^"]+)"/g, (_, name) => `name="${SPLIT_FIELD_PREFIX}${name}"`)
+        .replace(/\srequired(="[^"]*")?/g, "")
+    )
+    .join("");
+}
+
 function formatLedgerCell(field, value) {
   if (!value) {
     return "";
@@ -926,6 +1081,32 @@ function persistSelectedSumIds() {
 
 function getSelectedEntries() {
   return state.entries.filter((entry) => state.selectedSumIds.has(entry.id));
+}
+
+function isEntryValid(entry) {
+  return REQUIRED_FIELDS.every((field) => entry[field]);
+}
+
+function fillSplitEditorFields(entry) {
+  ENTRY_FIELDS.forEach((field) => {
+    const input = form.elements[`${SPLIT_FIELD_PREFIX}${field}`];
+    if (!input) {
+      return;
+    }
+
+    input.value = entry[field] ?? "";
+  });
+}
+
+function clearSplitEditorFields() {
+  ENTRY_FIELDS.forEach((field) => {
+    const input = form.elements[`${SPLIT_FIELD_PREFIX}${field}`];
+    if (!input) {
+      return;
+    }
+
+    input.value = "";
+  });
 }
 
 function toggleBulkSelection(entryId, forceState, options = {}) {

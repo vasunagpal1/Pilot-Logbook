@@ -282,6 +282,25 @@ body::before {
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+.split-panel {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(240, 186, 110, 0.08), rgba(255, 255, 255, 0.03));
+  border: 1px solid rgba(240, 186, 110, 0.24);
+}
+
+.split-panel__fields {
+  display: grid;
+  gap: 14px;
+}
+
+.split-panel .form-section {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
 .section-header {
   display: flex;
   justify-content: space-between;
