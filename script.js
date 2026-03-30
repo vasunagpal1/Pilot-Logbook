@@ -1,0 +1,885 @@
+const STORAGE_KEY = "pilot-logbook-atelier-v1";
+const SUM_SELECTION_KEY = "pilot-logbook-atelier-sum-selection-v1";
+
+const TIME_FIELDS = [
+  "seDayDual",
+  "seDayPic",
+  "seDayPicus",
+  "seDayCopilot",
+  "seNightDual",
+  "seNightPic",
+  "seNightPicus",
+  "seNightCopilot",
+  "meDayDual",
+  "meDayPic",
+  "meDayPicus",
+  "meDayCopilot",
+  "meNightDual",
+  "meNightPic",
+  "meNightPicus",
+  "meNightCopilot",
+];
+
+const DECIMAL_FIELDS = [
+  "instrumentActual",
+  "instrumentFstd",
+  "instructorSE",
+  "instructorME",
+  "fstdPrimary",
+  "fstdSecondary",
+  ...TIME_FIELDS,
+];
+
+const INTEGER_FIELDS = ["landingsDay", "landingsNight"];
+const SUMMABLE_FIELDS = [
+  "instrumentActual",
+  "instrumentFstd",
+  "instructorSE",
+  "instructorME",
+  "fstdPrimary",
+  "fstdSecondary",
+  ...TIME_FIELDS,
+  ...INTEGER_FIELDS,
+];
+
+const ENTRY_FIELDS = [
+  "date",
+  "type",
+  "registration",
+  "pilotInCommand",
+  "flightDetails",
+  "navaids",
+  "instrumentPlace",
+  "instrumentActual",
+  "instrumentFstd",
+  "instructorSE",
+  "instructorME",
+  "fstdPrimary",
+  "fstdSecondary",
+  ...TIME_FIELDS,
+  "landingsDay",
+  "landingsNight",
+  "remarks",
+];
+
+const LEDGER_FIELDS = [
+  "date",
+  "type",
+  "registration",
+  "pilotInCommand",
+  "flightDetails",
+  "navaids",
+  "instrumentPlace",
+  "instrumentActual",
+  "instrumentFstd",
+  "instructorSE",
+  "instructorME",
+  "fstdPrimary",
+  "fstdSecondary",
+  ...TIME_FIELDS,
+  "landingsDay",
+  "landingsNight",
+  "remarks",
+];
+
+const DEFAULT_ENTRY = Object.freeze(
+  ENTRY_FIELDS.reduce((entry, field) => {
+    entry[field] = "";
+    return entry;
+  }, {})
+);
+
+const initialEntries = loadEntries();
+
+const state = {
+  entries: initialEntries,
+  selectedSumIds: new Set(loadSelectedSumIds(initialEntries)),
+  selectedDeleteIds: new Set(),
+  editingId: null,
+  dragId: null,
+  dragPosition: null,
+};
+
+const form = document.querySelector("#entry-form");
+const saveButton = document.querySelector("#save-button");
+const resetFormButton = document.querySelector("#reset-form");
+const printButton = document.querySelector("#print-ledger");
+const formTitle = document.querySelector("#form-title");
+const formStatus = document.querySelector("#form-status");
+const ledgerBody = document.querySelector("#ledger-body");
+const ledgerFooter = document.querySelector("#ledger-footer");
+const entryList = document.querySelector("#entry-list");
+const emptyState = document.querySelector("#empty-state");
+const entryCount = document.querySelector("#entry-count");
+const flightHours = document.querySelector("#flight-hours");
+const landingCount = document.querySelector("#landing-count");
+const sumStatus = document.querySelector("#sum-status");
+const sumConsole = document.querySelector(".sum-console");
+const bulkStatus = document.querySelector("#bulk-status");
+const bulkConsole = document.querySelector(".bulk-console");
+const deleteSelectedButton = document.querySelector("#delete-selected");
+const deleteAllButton = document.querySelector("#delete-all");
+
+boot();
+
+function boot() {
+  bindEvents();
+  seedDefaultDate();
+  render();
+}
+
+function bindEvents() {
+  form.addEventListener("submit", handleSaveEntry);
+  resetFormButton.addEventListener("click", clearEditor);
+  printButton.addEventListener("click", () => window.print());
+
+  entryList.addEventListener("click", handleEntryCardAction);
+  entryList.addEventListener("change", handleEntrySelectionChange);
+  entryList.addEventListener("dragstart", handleDragStart);
+  entryList.addEventListener("dragover", handleDragOver);
+  entryList.addEventListener("drop", handleDrop);
+  entryList.addEventListener("dragend", clearDragMarkers);
+  sumConsole.addEventListener("click", handleSumConsoleAction);
+  bulkConsole.addEventListener("click", handleBulkConsoleAction);
+
+  ledgerBody.addEventListener("click", (event) => {
+    const row = event.target.closest("[data-entry-id]");
+    if (!row) {
+      return;
+    }
+
+    editEntry(row.dataset.entryId);
+  });
+}
+
+function handleSaveEntry(event) {
+  event.preventDefault();
+
+  const entry = readFormEntry();
+  if (!entry.date || !entry.type || !entry.registration || !entry.pilotInCommand) {
+    return;
+  }
+
+  if (state.editingId) {
+    state.entries = state.entries.map((item) =>
+      item.id === state.editingId ? { ...item, ...entry, updatedAt: new Date().toISOString() } : item
+    );
+  } else {
+    const newEntry = {
+      id: createId(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      ...entry,
+    };
+
+    state.entries.unshift(newEntry);
+    state.selectedSumIds.add(newEntry.id);
+  }
+
+  persistEntries();
+  persistSelectedSumIds();
+  render();
+  clearEditor({ preserveMessage: false });
+}
+
+function readFormEntry() {
+  const formData = new FormData(form);
+
+  return ENTRY_FIELDS.reduce((entry, field) => {
+    const rawValue = String(formData.get(field) ?? "").trim();
+    entry[field] = normalizeField(field, rawValue);
+    return entry;
+  }, {});
+}
+
+function normalizeField(field, rawValue) {
+  if (!rawValue) {
+    return "";
+  }
+
+  if (INTEGER_FIELDS.includes(field)) {
+    const numericValue = Math.max(0, Math.round(Number(rawValue)));
+    return Number.isFinite(numericValue) ? String(numericValue) : "";
+  }
+
+  if (DECIMAL_FIELDS.includes(field)) {
+    const numericValue = Math.max(0, Number(rawValue));
+    return Number.isFinite(numericValue) ? trimZeroes(numericValue.toFixed(1)) : "";
+  }
+
+  return rawValue;
+}
+
+function clearEditor(options = {}) {
+  form.reset();
+  state.editingId = null;
+  saveButton.textContent = "Save entry";
+  formTitle.textContent = "Add a flight entry";
+  formStatus.textContent = options.preserveMessage
+    ? formStatus.textContent
+    : "New entries are saved to this browser automatically.";
+  seedDefaultDate();
+  render();
+}
+
+function seedDefaultDate() {
+  const dateInput = form.elements.date;
+  if (dateInput && !dateInput.value) {
+    dateInput.value = formatDateInput(new Date());
+  }
+}
+
+function editEntry(entryId) {
+  const entry = state.entries.find((item) => item.id === entryId);
+  if (!entry) {
+    return;
+  }
+
+  state.editingId = entry.id;
+  ENTRY_FIELDS.forEach((field) => {
+    const input = form.elements[field];
+    if (!input) {
+      return;
+    }
+    input.value = entry[field] ?? "";
+  });
+
+  saveButton.textContent = "Update entry";
+  formTitle.textContent = "Edit flight entry";
+  formStatus.textContent = "Editing an existing row. Save to update the ledger in place.";
+  render();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function handleEntryCardAction(event) {
+  if (event.target.closest(".entry-select")) {
+    return;
+  }
+
+  const actionButton = event.target.closest("[data-action]");
+  if (!actionButton) {
+    const card = event.target.closest("[data-entry-id]");
+    if (card) {
+      editEntry(card.dataset.entryId);
+    }
+    return;
+  }
+
+  const card = actionButton.closest("[data-entry-id]");
+  if (!card) {
+    return;
+  }
+
+  const entryId = card.dataset.entryId;
+  const action = actionButton.dataset.action;
+
+  if (action === "edit") {
+    editEntry(entryId);
+    return;
+  }
+
+  if (action === "delete") {
+    deleteEntry(entryId);
+    return;
+  }
+
+  if (action === "toggle-sum") {
+    toggleSumSelection(entryId);
+    return;
+  }
+
+  if (action === "move-up") {
+    moveEntry(entryId, -1);
+    return;
+  }
+
+  if (action === "move-down") {
+    moveEntry(entryId, 1);
+  }
+}
+
+function handleEntrySelectionChange(event) {
+  const checkbox = event.target.closest("[data-bulk-select]");
+  if (!checkbox) {
+    return;
+  }
+
+  toggleBulkSelection(checkbox.value, checkbox.checked);
+}
+
+function deleteEntry(entryId) {
+  const entry = state.entries.find((item) => item.id === entryId);
+  if (!entry) {
+    return;
+  }
+
+  const ok = window.confirm(
+    `Delete the entry for ${formatLedgerDate(entry.date)} ${entry.type} ${entry.registration}?`
+  );
+  if (!ok) {
+    return;
+  }
+
+  state.entries = state.entries.filter((item) => item.id !== entryId);
+  state.selectedSumIds.delete(entryId);
+  state.selectedDeleteIds.delete(entryId);
+  if (state.editingId === entryId) {
+    clearEditor({ preserveMessage: true });
+  }
+  persistEntries();
+  persistSelectedSumIds();
+  render();
+}
+
+function moveEntry(entryId, direction) {
+  const currentIndex = state.entries.findIndex((item) => item.id === entryId);
+  const targetIndex = currentIndex + direction;
+
+  if (currentIndex < 0 || targetIndex < 0 || targetIndex >= state.entries.length) {
+    return;
+  }
+
+  const reordered = [...state.entries];
+  const [entry] = reordered.splice(currentIndex, 1);
+  reordered.splice(targetIndex, 0, entry);
+  state.entries = reordered;
+  persistEntries();
+  persistSelectedSumIds();
+  render();
+}
+
+function handleDragStart(event) {
+  const card = event.target.closest("[data-entry-id]");
+  if (!card) {
+    return;
+  }
+
+  state.dragId = card.dataset.entryId;
+  card.classList.add("is-dragging");
+  event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer.setData("text/plain", state.dragId);
+}
+
+function handleDragOver(event) {
+  event.preventDefault();
+  const targetCard = event.target.closest("[data-entry-id]");
+
+  resetDropMarkers();
+
+  if (!targetCard || targetCard.dataset.entryId === state.dragId) {
+    return;
+  }
+
+  const bounds = targetCard.getBoundingClientRect();
+  const placeAfter = event.clientY > bounds.top + bounds.height / 2;
+  targetCard.classList.add(placeAfter ? "drop-after" : "drop-before");
+  state.dragPosition = {
+    targetId: targetCard.dataset.entryId,
+    placeAfter,
+  };
+}
+
+function handleDrop(event) {
+  event.preventDefault();
+
+  if (!state.dragId || !state.dragPosition) {
+    clearDragMarkers();
+    return;
+  }
+
+  const fromIndex = state.entries.findIndex((item) => item.id === state.dragId);
+  const targetIndex = state.entries.findIndex((item) => item.id === state.dragPosition.targetId);
+
+  if (fromIndex < 0 || targetIndex < 0) {
+    clearDragMarkers();
+    return;
+  }
+
+  const reordered = [...state.entries];
+  const [draggedEntry] = reordered.splice(fromIndex, 1);
+  const insertIndex =
+    fromIndex < targetIndex
+      ? targetIndex + (state.dragPosition.placeAfter ? 0 : -1)
+      : targetIndex + (state.dragPosition.placeAfter ? 1 : 0);
+
+  reordered.splice(insertIndex, 0, draggedEntry);
+  state.entries = reordered;
+  persistEntries();
+  persistSelectedSumIds();
+  clearDragMarkers();
+  render();
+}
+
+function handleSumConsoleAction(event) {
+  const button = event.target.closest("[data-sum-action]");
+  if (!button) {
+    return;
+  }
+
+  const action = button.dataset.sumAction;
+  if (action === "select-all") {
+    state.selectedSumIds = new Set(state.entries.map((entry) => entry.id));
+  }
+
+  if (action === "clear") {
+    state.selectedSumIds = new Set();
+  }
+
+  persistSelectedSumIds();
+  render();
+}
+
+function handleBulkConsoleAction(event) {
+  const button = event.target.closest("[data-bulk-action]");
+  if (!button) {
+    return;
+  }
+
+  const action = button.dataset.bulkAction;
+
+  if (action === "select-all") {
+    state.selectedDeleteIds = new Set(state.entries.map((entry) => entry.id));
+    render();
+    return;
+  }
+
+  if (action === "clear") {
+    state.selectedDeleteIds = new Set();
+    render();
+    return;
+  }
+
+  if (action === "delete-selected") {
+    deleteSelectedEntries();
+    return;
+  }
+
+  if (action === "delete-all") {
+    deleteAllEntries();
+  }
+}
+
+function deleteSelectedEntries() {
+  const selectedEntries = state.entries.filter((entry) => state.selectedDeleteIds.has(entry.id));
+  if (!selectedEntries.length) {
+    return;
+  }
+
+  const message =
+    selectedEntries.length === state.entries.length
+      ? `Delete all ${selectedEntries.length} saved entries?`
+      : `Delete ${selectedEntries.length} selected entr${selectedEntries.length === 1 ? "y" : "ies"}?`;
+
+  if (!window.confirm(message)) {
+    return;
+  }
+
+  const selectedIds = new Set(selectedEntries.map((entry) => entry.id));
+  state.entries = state.entries.filter((entry) => !selectedIds.has(entry.id));
+  state.selectedDeleteIds = new Set();
+  state.selectedSumIds = new Set(
+    [...state.selectedSumIds].filter((entryId) => !selectedIds.has(entryId))
+  );
+
+  if (state.editingId && selectedIds.has(state.editingId)) {
+    form.reset();
+    state.editingId = null;
+    saveButton.textContent = "Save entry";
+    formTitle.textContent = "Add a flight entry";
+    formStatus.textContent = "New entries are saved to this browser automatically.";
+    seedDefaultDate();
+  }
+
+  persistEntries();
+  persistSelectedSumIds();
+  render();
+}
+
+function deleteAllEntries() {
+  if (!state.entries.length) {
+    return;
+  }
+
+  if (!window.confirm(`Delete all ${state.entries.length} saved entries?`)) {
+    return;
+  }
+
+  state.entries = [];
+  state.selectedDeleteIds = new Set();
+  state.selectedSumIds = new Set();
+  form.reset();
+  state.editingId = null;
+  saveButton.textContent = "Save entry";
+  formTitle.textContent = "Add a flight entry";
+  formStatus.textContent = "New entries are saved to this browser automatically.";
+  seedDefaultDate();
+
+  persistEntries();
+  persistSelectedSumIds();
+  render();
+}
+
+function clearDragMarkers() {
+  state.dragId = null;
+  state.dragPosition = null;
+  resetDropMarkers();
+  entryList.querySelectorAll(".entry-card").forEach((card) => {
+    card.classList.remove("is-dragging");
+  });
+}
+
+function resetDropMarkers() {
+  entryList.querySelectorAll(".entry-card").forEach((card) => {
+    card.classList.remove("drop-before", "drop-after");
+  });
+}
+
+function render() {
+  renderSummary();
+  renderSumConsole();
+  renderBulkConsole();
+  renderManifest();
+  renderLedger();
+}
+
+function renderSummary() {
+  const totalHours = state.entries.reduce((sum, entry) => sum + sumTimeColumns(entry), 0);
+  const totalLandings = state.entries.reduce(
+    (sum, entry) => sum + toNumber(entry.landingsDay) + toNumber(entry.landingsNight),
+    0
+  );
+
+  entryCount.textContent = String(state.entries.length);
+  flightHours.textContent = formatTotal(totalHours);
+  landingCount.textContent = String(totalLandings);
+}
+
+function renderManifest() {
+  emptyState.hidden = state.entries.length > 0;
+  entryList.innerHTML = state.entries
+    .map((entry, index) => createEntryCard(entry, index))
+    .join("");
+}
+
+function renderBulkConsole() {
+  const totalRows = state.entries.length;
+  const selectedRows = state.selectedDeleteIds.size;
+
+  if (!totalRows) {
+    bulkStatus.textContent = "Save entries to unlock bulk selection and bulk delete.";
+  } else if (!selectedRows) {
+    bulkStatus.textContent = "Select one or more entries to delete them together.";
+  } else if (selectedRows === totalRows) {
+    bulkStatus.textContent = `All ${totalRows} entries are selected for bulk delete.`;
+  } else {
+    bulkStatus.textContent = `${selectedRows} of ${totalRows} entries selected for bulk delete.`;
+  }
+
+  deleteSelectedButton.textContent = selectedRows
+    ? `Delete selected (${selectedRows})`
+    : "Delete selected";
+  deleteSelectedButton.disabled = selectedRows === 0;
+  deleteAllButton.disabled = totalRows === 0;
+}
+
+function renderSumConsole() {
+  const totalRows = state.entries.length;
+  const selectedRows = getSelectedEntries().length;
+
+  if (!totalRows) {
+    sumStatus.textContent = "Save entries to activate automatic and manual column sums.";
+    return;
+  }
+
+  if (selectedRows === totalRows) {
+    sumStatus.textContent = `Default totals are using all ${totalRows} saved rows.`;
+    return;
+  }
+
+  if (!selectedRows) {
+    sumStatus.textContent = "No rows are selected for the manual sum right now.";
+    return;
+  }
+
+  sumStatus.textContent = `Manual sum is using ${selectedRows} of ${totalRows} saved rows.`;
+}
+
+function createEntryCard(entry, index) {
+  const isActive = entry.id === state.editingId;
+  const isSelectedForSum = state.selectedSumIds.has(entry.id);
+  const isSelectedForDelete = state.selectedDeleteIds.has(entry.id);
+
+  return `
+    <li class="entry-card ${isActive ? "is-active" : ""} ${isSelectedForSum ? "is-in-sum" : ""} ${isSelectedForDelete ? "is-bulk-selected" : ""}" data-entry-id="${entry.id}" draggable="true">
+      <div class="entry-card__top">
+        <div>
+          <p class="entry-card__title">${escapeHtml(formatLedgerDate(entry.date))} • ${escapeHtml(entry.type)}</p>
+          <p class="entry-card__subtitle">${escapeHtml(entry.registration)} • ${escapeHtml(entry.pilotInCommand)}</p>
+        </div>
+        <div class="entry-card__controls">
+          <label class="entry-select" aria-label="Select entry for bulk delete">
+            <input class="entry-select__checkbox" type="checkbox" data-bulk-select value="${entry.id}" ${isSelectedForDelete ? "checked" : ""} />
+            <span>Select</span>
+          </label>
+          <span class="entry-card__handle" aria-hidden="true">:::</span>
+        </div>
+      </div>
+      <div class="entry-card__meta">
+        <span class="chip">${escapeHtml(sumTimeColumns(entry, true))} hrs</span>
+        <span class="chip">${escapeHtml(entry.landingsDay || "0")} day landings</span>
+        <span class="chip">${escapeHtml(entry.landingsNight || "0")} night landings</span>
+        <span class="chip ${isSelectedForSum ? "is-selected" : "is-deselected"}">
+          ${isSelectedForSum ? "Included in manual sum" : "Excluded from manual sum"}
+        </span>
+        ${isSelectedForDelete ? '<span class="chip is-deselected">Selected for delete</span>' : ""}
+        <span class="chip">Row ${index + 1}</span>
+      </div>
+      <div class="entry-card__actions">
+        <button type="button" class="mini-button" data-action="edit">Edit</button>
+        <button type="button" class="mini-button ${isSelectedForSum ? "is-selected" : ""}" data-action="toggle-sum">
+          ${isSelectedForSum ? "Sum on" : "Use in sum"}
+        </button>
+        <button type="button" class="mini-button" data-action="move-up">Move up</button>
+        <button type="button" class="mini-button" data-action="move-down">Move down</button>
+        <button type="button" class="mini-button" data-action="delete">Delete</button>
+      </div>
+    </li>
+  `;
+}
+
+function renderLedger() {
+  const rows = state.entries.map((entry) => createLedgerRow(entry)).join("");
+  const blankCount = Math.max(18 - state.entries.length, 6);
+  const blanks = Array.from({ length: blankCount }, () => createBlankRow()).join("");
+
+  ledgerBody.innerHTML = rows + blanks;
+  ledgerFooter.innerHTML = createFooter();
+}
+
+function createLedgerRow(entry) {
+  const cells = LEDGER_FIELDS.map((field, index) => {
+    const value = formatLedgerCell(field, entry[field]);
+    const classes = [
+      isCenteredField(field) ? "cell-center" : "",
+      field === "remarks" && !value ? "cell-note" : "",
+      field === "flightDetails" || field === "remarks" ? "cell-wrap" : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    return `<td class="${classes}">${escapeHtml(value)}</td>`;
+  }).join("");
+
+  return `
+    <tr class="filled-row ${entry.id === state.editingId ? "is-active" : ""} ${state.selectedSumIds.has(entry.id) ? "is-in-sum" : ""}" data-entry-id="${entry.id}">
+      ${cells}
+    </tr>
+  `;
+}
+
+function createBlankRow() {
+  return `
+    <tr class="blank-row" aria-hidden="true">
+      ${Array.from({ length: LEDGER_FIELDS.length }, () => "<td>&nbsp;</td>").join("")}
+    </tr>
+  `;
+}
+
+function createFooter() {
+  const selectedEntries = getSelectedEntries();
+
+  return `
+    ${createSumFooterRow({
+      label: "Automatic sum • all saved rows",
+      entries: state.entries,
+      note: state.entries.length
+        ? `Rows included: ${state.entries.length} • Flight time cols 14 to 29: ${formatFooterNumber(
+            state.entries.reduce((sum, entry) => sum + sumTimeColumns(entry), 0)
+          )}`
+        : "Only numeric columns are totaled.",
+    })}
+    ${createSumFooterRow({
+      label: "Manual sum • selected rows",
+      entries: selectedEntries,
+      note: state.entries.length
+        ? `${selectedEntries.length} of ${state.entries.length} rows selected for the custom subtotal`
+        : "Save entries to start building a manual subtotal.",
+      isManual: true,
+    })}
+  `;
+}
+
+function createSumFooterRow({ label, entries, note, isManual = false }) {
+  const hasAnyRows = state.entries.length > 0;
+  const totals = SUMMABLE_FIELDS.map((field) =>
+    formatFooterNumber(
+      entries.reduce((sum, entry) => sum + toNumber(entry[field]), 0),
+      INTEGER_FIELDS.includes(field),
+      hasAnyRows
+    )
+  );
+
+  return `
+    <tr>
+      <th colspan="7" class="footer-label">${escapeHtml(label)}</th>
+      ${totals.map((value) => `<td class="cell-center">${value}</td>`).join("")}
+      <td class="footer-note">${escapeHtml(note)}</td>
+    </tr>
+  `;
+}
+
+function formatLedgerCell(field, value) {
+  if (!value) {
+    return "";
+  }
+
+  if (field === "date") {
+    return formatLedgerDate(value);
+  }
+
+  return value;
+}
+
+function isCenteredField(field) {
+  return field !== "flightDetails" && field !== "remarks" && field !== "pilotInCommand";
+}
+
+function sumTimeColumns(entry, asText = false) {
+  const total = TIME_FIELDS.reduce((sum, field) => sum + toNumber(entry[field]), 0);
+  return asText ? formatTotal(total) : total;
+}
+
+function formatFooterNumber(value, integer = false, showZero = true) {
+  if (!value && !showZero) {
+    return "";
+  }
+
+  return integer ? String(Math.round(value)) : formatTotal(value);
+}
+
+function formatTotal(value) {
+  return trimZeroes(value.toFixed(1));
+}
+
+function trimZeroes(value) {
+  return value.replace(/\.0$/, ".0").replace(/(\.\d*[1-9])0+$/, "$1");
+}
+
+function toNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function loadEntries() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      return [];
+    }
+
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed.map((entry) => ({ ...DEFAULT_ENTRY, ...entry }));
+  } catch (error) {
+    return [];
+  }
+}
+
+function loadSelectedSumIds(entries) {
+  try {
+    const raw = localStorage.getItem(SUM_SELECTION_KEY);
+    if (raw === null) {
+      return entries.map((entry) => entry.id);
+    }
+
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return entries.map((entry) => entry.id);
+    }
+
+    const entryIds = new Set(entries.map((entry) => entry.id));
+    return parsed.filter((entryId) => entryIds.has(entryId));
+  } catch (error) {
+    return entries.map((entry) => entry.id);
+  }
+}
+
+function persistEntries() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state.entries));
+}
+
+function persistSelectedSumIds() {
+  const orderedSelection = state.entries
+    .map((entry) => entry.id)
+    .filter((entryId) => state.selectedSumIds.has(entryId));
+
+  localStorage.setItem(SUM_SELECTION_KEY, JSON.stringify(orderedSelection));
+}
+
+function getSelectedEntries() {
+  return state.entries.filter((entry) => state.selectedSumIds.has(entry.id));
+}
+
+function toggleBulkSelection(entryId, forceState) {
+  const shouldSelect =
+    typeof forceState === "boolean" ? forceState : !state.selectedDeleteIds.has(entryId);
+
+  if (shouldSelect) {
+    state.selectedDeleteIds.add(entryId);
+  } else {
+    state.selectedDeleteIds.delete(entryId);
+  }
+
+  render();
+}
+
+function toggleSumSelection(entryId) {
+  if (state.selectedSumIds.has(entryId)) {
+    state.selectedSumIds.delete(entryId);
+  } else {
+    state.selectedSumIds.add(entryId);
+  }
+
+  persistSelectedSumIds();
+  render();
+}
+
+function createId() {
+  if (window.crypto && typeof window.crypto.randomUUID === "function") {
+    return window.crypto.randomUUID();
+  }
+
+  return `entry-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function formatLedgerDate(value) {
+  if (!value) {
+    return "";
+  }
+
+  const [year, month, day] = value.split("-");
+  if (!year || !month || !day) {
+    return value;
+  }
+
+  return `${day}/${month}/${year}`;
+}
+
+function formatDateInput(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
