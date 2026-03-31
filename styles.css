@@ -95,6 +95,48 @@ body::before {
   padding: 18px 22px;
 }
 
+.sync-console {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(159, 213, 206, 0.08), rgba(255, 255, 255, 0.03));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: grid;
+  gap: 12px;
+}
+
+.sync-console__eyebrow {
+  margin: 0 0 6px;
+  color: var(--mint);
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 0.62rem;
+}
+
+.sync-console__status,
+.sync-console__hint,
+.sync-console__feedback {
+  margin: 0;
+}
+
+.sync-console__status {
+  font-size: 0.94rem;
+  color: white;
+}
+
+.sync-console__hint,
+.sync-console__feedback {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.sync-console__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .eyebrow,
 .panel-kicker,
 .paper-label {
@@ -462,6 +504,13 @@ body::before {
 
 .button:hover {
   transform: translateY(-1px);
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+  box-shadow: none;
 }
 
 .button-primary {
@@ -1156,7 +1205,8 @@ body::before {
   .matrix-title,
   .section-header,
   .sum-console,
-  .bulk-console {
+  .bulk-console,
+  .sync-console__actions {
     align-items: start;
     flex-direction: column;
   }

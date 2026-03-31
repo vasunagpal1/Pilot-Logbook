@@ -21,6 +21,24 @@
         <h1>Fast entry. Clean ledger. Ready to print.</h1>
         <p class="hero-text">Save, edit, reorder, total, and print your flights from one page.</p>
         <p class="maker-signature">Made by Uran Khatola</p>
+
+        <section class="sync-console" aria-label="Sync and account controls">
+          <div>
+            <p class="sync-console__eyebrow">Sync &amp; Access</p>
+            <p id="auth-status" class="sync-console__status">Guest mode: entries stay on this device only.</p>
+            <p id="sync-message" class="sync-console__hint">
+              Sign in with Google to sync your logbook across devices. You can import this device's entries into cloud at any time.
+            </p>
+          </div>
+          <div class="sync-console__actions">
+            <button type="button" class="button button-primary" id="sign-in-button">Sign in with Google</button>
+            <button type="button" class="button button-ghost" id="sign-out-button" hidden>Sign out</button>
+            <button type="button" class="button button-ghost" id="import-local-button">
+              Import device data to cloud
+            </button>
+          </div>
+          <p id="sync-feedback" class="sync-console__feedback" aria-live="polite"></p>
+        </section>
       </div>
 
       <div class="hero-metrics">
@@ -39,7 +57,7 @@
           </article>
           <article class="stat-card">
             <p class="stat-label">Storage</p>
-            <p class="stat-value small">Local browser vault</p>
+            <p id="storage-mode" class="stat-value small">Local browser vault</p>
           </article>
         </div>
 
@@ -341,7 +359,7 @@
                 <p class="panel-kicker">Saved Ledger</p>
                 <h2>Entry stack</h2>
               </div>
-              <p class="panel-status">Drag cards to reorder the printed ledger rows.</p>
+              <p id="manifest-status" class="panel-status">Drag cards to reorder the printed ledger rows.</p>
             </div>
 
             <div class="panel-scroll panel-scroll--manifest">
@@ -574,6 +592,6 @@
       <section class="print-ledger-pages" id="print-ledger-pages" aria-hidden="true"></section>
     </main>
 
-    <script src="script.js"></script>
+    <script type="module" src="script.js"></script>
   </body>
 </html>

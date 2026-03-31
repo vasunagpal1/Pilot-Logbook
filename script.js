@@ -1,3 +1,13 @@
+import {
+  deleteUserEntries,
+  deleteUserEntry,
+  loadUserEntries,
+  signInWithGooglePopup,
+  signOutCurrentUser,
+  subscribeToAuthState,
+  upsertUserEntries,
+} from "./firebase-client.js";
+
 const STORAGE_KEY = "pilot-logbook-atelier-v1";
 const SUM_SELECTION_KEY = "pilot-logbook-atelier-sum-selection-v1";
 const DISPLAY_PREFERENCES_KEY = "pilot-logbook-display-preferences-v1";
@@ -100,11 +110,12 @@ const DEFAULT_ENTRY = Object.freeze(
   }, {})
 );
 
-const initialEntries = loadEntries();
+const initialLocalEntries = loadEntries();
 
 const state = {
-  entries: initialEntries,
-  selectedSumIds: new Set(loadSelectedSumIds(initialEntries)),
+  entries: initialLocalEntries,
+  localEntries: initialLocalEntries,
+  selectedSumIds: new Set(loadSelectedSumIds(initialLocalEntries)),
   selectedDeleteIds: new Set(),
   editingId: null,
   splitSourceId: null,
@@ -113,6 +124,11 @@ const state = {
   hideEmptyColumns: loadDisplayPreferences().hideEmptyColumns,
   dragId: null,
   dragPosition: null,
+  user: null,
+  authResolved: false,
+  storageMode: "guest",
+  isBusy: false,
+  syncFeedback: "",
 };
 
 const form = document.querySelector("#entry-form");
@@ -138,6 +154,7 @@ const emptyState = document.querySelector("#empty-state");
 const entryCount = document.querySelector("#entry-count");
 const flightHours = document.querySelector("#flight-hours");
 const landingCount = document.querySelector("#landing-count");
+const storageModeValue = document.querySelector("#storage-mode");
 const summaryIfActual = document.querySelector("#summary-if-actual");
 const summaryFstd = document.querySelector("#summary-fstd");
 const summarySeDual = document.querySelector("#summary-se-dual");
@@ -148,22 +165,30 @@ const sumStatus = document.querySelector("#sum-status");
 const sumConsole = document.querySelector(".sum-console");
 const bulkStatus = document.querySelector("#bulk-status");
 const bulkConsole = document.querySelector(".bulk-console");
+const manifestStatus = document.querySelector("#manifest-status");
 const ledgerModeStatus = document.querySelector("#ledger-mode-status");
 const ledgerModeToggle = document.querySelector(".ledger-mode-toggle");
 const hideZeroValuesToggle = document.querySelector("#hide-zero-values");
 const hideEmptyColumnsToggle = document.querySelector("#hide-empty-columns");
 const deleteSelectedButton = document.querySelector("#delete-selected");
 const deleteAllButton = document.querySelector("#delete-all");
+const signInButton = document.querySelector("#sign-in-button");
+const signOutButton = document.querySelector("#sign-out-button");
+const importLocalButton = document.querySelector("#import-local-button");
+const authStatus = document.querySelector("#auth-status");
+const syncMessage = document.querySelector("#sync-message");
+const syncFeedback = document.querySelector("#sync-feedback");
 const ledgerColgroupMarkup = ledgerTable.querySelector("colgroup").outerHTML;
 const ledgerHeadMarkup = ledgerTable.querySelector("thead").outerHTML;
 
 boot();
 
-function boot() {
+async function boot() {
   buildSplitEditor();
   bindEvents();
   seedDefaultDate();
   render();
+  subscribeToAuthState(handleAuthStateChange);
 }
 
 function bindEvents() {
@@ -173,6 +198,9 @@ function bindEvents() {
   deleteEntryButton.addEventListener("click", handleEditorDelete);
   resetFormButton.addEventListener("click", clearEditor);
   printButton.addEventListener("click", () => window.print());
+  signInButton.addEventListener("click", handleSignIn);
+  signOutButton.addEventListener("click", handleSignOut);
+  importLocalButton.addEventListener("click", handleImportLocalToCloud);
 
   entryList.addEventListener("click", handleEntryCardAction);
   entryList.addEventListener("change", handleEntrySelectionChange);
@@ -203,8 +231,286 @@ function bindEvents() {
   });
 }
 
-function handleSaveEntry(event) {
+async function handleAuthStateChange(user) {
+  state.user = user ?? null;
+  state.authResolved = true;
+
+  if (!user) {
+    state.storageMode = "guest";
+    applyEntries(state.localEntries);
+    state.isBusy = false;
+    resetEditorState({ preserveMessage: false });
+    render();
+    return;
+  }
+
+  state.storageMode = "cloud";
+  state.isBusy = true;
+  render();
+
+  try {
+    const cloudEntries = await loadCloudEntriesForCurrentUser();
+    applyEntries(cloudEntries);
+    state.syncFeedback = cloudEntries.length
+      ? "Cloud sync is active."
+      : "Signed in. Your cloud logbook is ready for its first synced entry.";
+    resetEditorState({ preserveMessage: false });
+  } catch (error) {
+    console.error(error);
+    state.syncFeedback = "Cloud data could not be loaded right now. Your guest entries are still safe on this device.";
+    state.storageMode = "guest";
+    applyEntries(state.localEntries);
+  } finally {
+    state.isBusy = false;
+    render();
+  }
+}
+
+async function handleSignIn() {
+  if (state.isBusy) {
+    return;
+  }
+
+  state.isBusy = true;
+  state.syncFeedback = "";
+  render();
+
+  try {
+    await signInWithGooglePopup();
+    state.syncFeedback = "Signed in. Loading your cloud logbook.";
+  } catch (error) {
+    console.error(error);
+    state.syncFeedback = error?.code === "auth/popup-closed-by-user"
+      ? "Google sign-in was closed before finishing."
+      : "Google sign-in could not be completed right now.";
+  } finally {
+    state.isBusy = false;
+    render();
+  }
+}
+
+async function handleSignOut() {
+  if (state.isBusy) {
+    return;
+  }
+
+  state.isBusy = true;
+  render();
+
+  try {
+    await signOutCurrentUser();
+    state.syncFeedback = "Signed out. You are back in guest mode on this device.";
+  } catch (error) {
+    console.error(error);
+    state.syncFeedback = "Sign out could not be completed right now.";
+    state.isBusy = false;
+    render();
+  }
+}
+
+async function handleImportLocalToCloud() {
+  if (!isCloudMode()) {
+    state.syncFeedback = "Sign in with Google first, then you can import this device's entries into cloud.";
+    render();
+    return;
+  }
+
+  if (state.isBusy) {
+    return;
+  }
+
+  if (!state.localEntries.length) {
+    state.syncFeedback = "There are no guest entries on this device to import.";
+    render();
+    return;
+  }
+
+  const importedEntries = buildImportedEntries(state.localEntries, state.entries);
+  if (!importedEntries.length) {
+    state.syncFeedback = "This device's entries are already present in your cloud logbook.";
+    render();
+    return;
+  }
+
+  if (!window.confirm(`Import ${importedEntries.length} device entr${importedEntries.length === 1 ? "y" : "ies"} into your cloud logbook? Existing cloud entries will stay in place.`)) {
+    return;
+  }
+
+  state.isBusy = true;
+  render();
+
+  try {
+    await upsertUserEntries(state.user.uid, importedEntries.map(serializeEntryForCloud));
+    applyEntries([...state.entries, ...importedEntries]);
+    state.syncFeedback = `Imported ${importedEntries.length} device entr${importedEntries.length === 1 ? "y" : "ies"} into cloud.`;
+  } catch (error) {
+    console.error(error);
+    state.syncFeedback = "Import could not be completed right now.";
+  } finally {
+    state.isBusy = false;
+    render();
+  }
+}
+
+function isCloudMode() {
+  return Boolean(state.user) && state.storageMode === "cloud";
+}
+
+function getDefaultFormStatus() {
+  return isCloudMode()
+    ? "Signed in. Entries sync to your private cloud logbook."
+    : "Guest mode: new entries are saved to this browser automatically.";
+}
+
+function applyEntries(entries) {
+  const normalizedEntries = entries
+    .map((entry, index) => normalizeStoredEntry(entry, index))
+    .sort((firstEntry, secondEntry) => getEntrySortOrder(firstEntry) - getEntrySortOrder(secondEntry));
+
+  state.entries = normalizedEntries;
+  state.selectedDeleteIds = new Set(
+    [...state.selectedDeleteIds].filter((entryId) => normalizedEntries.some((entry) => entry.id === entryId))
+  );
+  state.selectedSumIds = new Set(loadSelectedSumIds(normalizedEntries));
+}
+
+function normalizeStoredEntry(entry, fallbackIndex = 0) {
+  return {
+    ...DEFAULT_ENTRY,
+    ...entry,
+    id: entry.id || createId(),
+    createdAt: entry.createdAt || new Date().toISOString(),
+    updatedAt: entry.updatedAt || new Date().toISOString(),
+    sortOrder: Number.isFinite(Number(entry.sortOrder)) ? Number(entry.sortOrder) : (fallbackIndex + 1) * 1024,
+  };
+}
+
+function getEntrySortOrder(entry) {
+  return Number.isFinite(Number(entry.sortOrder)) ? Number(entry.sortOrder) : 0;
+}
+
+async function loadCloudEntriesForCurrentUser() {
+  if (!state.user) {
+    return [];
+  }
+
+  const entries = await loadUserEntries(state.user.uid);
+  return entries.map((entry, index) => normalizeStoredEntry(entry, index));
+}
+
+function serializeEntryForCloud(entry) {
+  return {
+    id: entry.id,
+    createdAt: entry.createdAt || new Date().toISOString(),
+    updatedAt: entry.updatedAt || new Date().toISOString(),
+    sortOrder: getEntrySortOrder(entry),
+    ...ENTRY_FIELDS.reduce((record, field) => {
+      record[field] = entry[field] ?? "";
+      return record;
+    }, {}),
+  };
+}
+
+function persistLocalEntries() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state.localEntries));
+}
+
+function setLocalEntries(entries) {
+  state.localEntries = entries.map((entry, index) => normalizeStoredEntry(entry, index));
+  persistLocalEntries();
+}
+
+function buildEntryFingerprint(entry) {
+  return ENTRY_FIELDS.map((field) => String(entry[field] ?? "").trim()).join("||");
+}
+
+function buildImportedEntries(localEntries, cloudEntries) {
+  const cloudFingerprintCounts = cloudEntries.reduce((counts, entry) => {
+    const fingerprint = buildEntryFingerprint(entry);
+    counts.set(fingerprint, (counts.get(fingerprint) || 0) + 1);
+    return counts;
+  }, new Map());
+  let tailSortOrder = cloudEntries.length ? getEntrySortOrder(cloudEntries[cloudEntries.length - 1]) : 0;
+
+  return localEntries.reduce((imports, localEntry) => {
+    const fingerprint = buildEntryFingerprint(localEntry);
+    const remainingCloudCount = cloudFingerprintCounts.get(fingerprint) || 0;
+    if (remainingCloudCount > 0) {
+      cloudFingerprintCounts.set(fingerprint, remainingCloudCount - 1);
+      return imports;
+    }
+
+    tailSortOrder += 1024;
+    imports.push(
+      normalizeStoredEntry(
+        {
+          ...localEntry,
+          id: createId(),
+          createdAt: localEntry.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          sortOrder: tailSortOrder,
+        },
+        cloudEntries.length + imports.length
+      )
+    );
+
+    return imports;
+  }, []);
+}
+
+function createTopSortOrder(entries) {
+  if (!entries.length) {
+    return 1024;
+  }
+
+  return getEntrySortOrder(entries[0]) - 1024;
+}
+
+function createBottomSortOrder(entries) {
+  if (!entries.length) {
+    return 1024;
+  }
+
+  return getEntrySortOrder(entries[entries.length - 1]) + 1024;
+}
+
+function getSortOrderBetween(previousEntry, nextEntry) {
+  if (!previousEntry && !nextEntry) {
+    return 1024;
+  }
+
+  if (!previousEntry) {
+    return getEntrySortOrder(nextEntry) - 1024;
+  }
+
+  if (!nextEntry) {
+    return getEntrySortOrder(previousEntry) + 1024;
+  }
+
+  const previousOrder = getEntrySortOrder(previousEntry);
+  const nextOrder = getEntrySortOrder(nextEntry);
+
+  if (nextOrder - previousOrder <= 0.0001) {
+    return previousOrder + 0.5;
+  }
+
+  return (previousOrder + nextOrder) / 2;
+}
+
+async function persistCloudEntries(entries) {
+  if (!isCloudMode()) {
+    return;
+  }
+
+  await upsertUserEntries(state.user.uid, entries.map(serializeEntryForCloud));
+}
+
+async function handleSaveEntry(event) {
   event.preventDefault();
+
+  if (state.isBusy) {
+    return;
+  }
 
   const entry = readFormEntry();
   if (!isEntryValid(entry)) {
@@ -222,33 +528,66 @@ function handleSaveEntry(event) {
       return;
     }
 
-    saveSplitEntries(entry, splitEntry);
+    await saveSplitEntries(entry, splitEntry);
     return;
   }
 
-  if (entryIdToReveal) {
-    state.entries = state.entries.map((item) =>
-      item.id === entryIdToReveal ? { ...item, ...entry, updatedAt: new Date().toISOString() } : item
-    );
-  } else {
-    const newEntry = {
-      id: createId(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      ...entry,
-    };
-
-    state.entries.unshift(newEntry);
-    state.selectedSumIds.add(newEntry.id);
-  }
-
-  persistEntries();
-  persistSelectedSumIds();
-  resetEditorState();
+  state.isBusy = true;
   render();
 
-  if (entryIdToReveal) {
-    revealLedgerEntry(entryIdToReveal);
+  try {
+    if (entryIdToReveal) {
+      const existingEntry = state.entries.find((item) => item.id === entryIdToReveal);
+      if (!existingEntry) {
+        return;
+      }
+
+      const updatedEntry = normalizeStoredEntry({
+        ...existingEntry,
+        ...entry,
+        updatedAt: new Date().toISOString(),
+      });
+
+      state.entries = state.entries.map((item) => (item.id === entryIdToReveal ? updatedEntry : item));
+
+      if (isCloudMode()) {
+        await persistCloudEntries([updatedEntry]);
+      } else {
+        setLocalEntries(state.entries);
+      }
+    } else {
+      const newEntry = normalizeStoredEntry({
+        id: createId(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        sortOrder: createTopSortOrder(state.entries),
+        ...entry,
+      });
+
+      state.entries = [newEntry, ...state.entries];
+      state.selectedSumIds.add(newEntry.id);
+
+      if (isCloudMode()) {
+        await persistCloudEntries([newEntry]);
+      } else {
+        setLocalEntries(state.entries);
+      }
+    }
+
+    persistSelectedSumIds();
+    resetEditorState();
+
+    if (entryIdToReveal) {
+      revealLedgerEntry(entryIdToReveal);
+    }
+  } catch (error) {
+    console.error(error);
+    formStatus.textContent = isCloudMode()
+      ? "Cloud save failed. Please try again."
+      : "This entry could not be saved right now.";
+  } finally {
+    state.isBusy = false;
+    render();
   }
 }
 
@@ -292,7 +631,7 @@ function resetEditorState(options = {}) {
   clearSplitEditorFields();
   formStatus.textContent = options.preserveMessage
     ? formStatus.textContent
-    : "New entries are saved to this browser automatically.";
+    : getDefaultFormStatus();
   seedDefaultDate();
 }
 
@@ -323,12 +662,14 @@ function editEntry(entryId) {
     input.value = entry[field] ?? "";
   });
 
-  formStatus.textContent = "Editing an existing row. Save to update the ledger in place.";
+  formStatus.textContent = isCloudMode()
+    ? "Editing a cloud row. Save to update your private synced logbook."
+    : "Editing an existing row. Save to update the ledger in place.";
   render();
   scrollEditorIntoView();
 }
 
-function handleEntryCardAction(event) {
+async function handleEntryCardAction(event) {
   if (event.target.closest(".entry-select")) {
     return;
   }
@@ -361,7 +702,7 @@ function handleEntryCardAction(event) {
   }
 
   if (action === "delete") {
-    deleteEntry(entryId);
+    await deleteEntry(entryId);
     return;
   }
 
@@ -371,12 +712,12 @@ function handleEntryCardAction(event) {
   }
 
   if (action === "move-up") {
-    moveEntry(entryId, -1);
+    await moveEntry(entryId, -1);
     return;
   }
 
   if (action === "move-down") {
-    moveEntry(entryId, 1);
+    await moveEntry(entryId, 1);
   }
 }
 
@@ -389,9 +730,9 @@ function handleEntrySelectionChange(event) {
   toggleBulkSelection(checkbox.value, checkbox.checked);
 }
 
-function deleteEntry(entryId) {
+async function deleteEntry(entryId) {
   const entry = state.entries.find((item) => item.id === entryId);
-  if (!entry) {
+  if (!entry || state.isBusy) {
     return;
   }
 
@@ -402,40 +743,74 @@ function deleteEntry(entryId) {
     return;
   }
 
-  state.entries = state.entries.filter((item) => item.id !== entryId);
-  state.selectedSumIds.delete(entryId);
-  state.selectedDeleteIds.delete(entryId);
-  if (state.editingId === entryId) {
-    resetEditorState({ preserveMessage: true });
-  }
-  persistEntries();
-  persistSelectedSumIds();
+  state.isBusy = true;
   render();
+
+  try {
+    state.entries = state.entries.filter((item) => item.id !== entryId);
+    state.selectedSumIds.delete(entryId);
+    state.selectedDeleteIds.delete(entryId);
+    if (state.editingId === entryId) {
+      resetEditorState({ preserveMessage: true });
+    }
+
+    if (isCloudMode()) {
+      await deleteUserEntry(state.user.uid, entryId);
+    } else {
+      setLocalEntries(state.entries);
+    }
+
+    persistSelectedSumIds();
+  } catch (error) {
+    console.error(error);
+    state.syncFeedback = isCloudMode() ? "That cloud entry could not be deleted right now." : "That entry could not be deleted right now.";
+  } finally {
+    state.isBusy = false;
+    render();
+  }
 }
 
-function handleEditorDelete() {
+async function handleEditorDelete() {
   if (!state.editingId) {
     return;
   }
 
-  deleteEntry(state.editingId);
+  await deleteEntry(state.editingId);
 }
 
-function moveEntry(entryId, direction) {
+async function moveEntry(entryId, direction) {
   const currentIndex = state.entries.findIndex((item) => item.id === entryId);
   const targetIndex = currentIndex + direction;
 
-  if (currentIndex < 0 || targetIndex < 0 || targetIndex >= state.entries.length) {
+  if (currentIndex < 0 || targetIndex < 0 || targetIndex >= state.entries.length || state.isBusy) {
     return;
   }
 
   const reordered = [...state.entries];
   const [entry] = reordered.splice(currentIndex, 1);
   reordered.splice(targetIndex, 0, entry);
+  const movedEntry = reordered[targetIndex];
+  movedEntry.sortOrder = getSortOrderBetween(reordered[targetIndex - 1], reordered[targetIndex + 1]);
   state.entries = reordered;
-  persistEntries();
-  persistSelectedSumIds();
+
+  state.isBusy = true;
   render();
+
+  try {
+    if (isCloudMode()) {
+      await persistCloudEntries([movedEntry]);
+    } else {
+      setLocalEntries(state.entries);
+    }
+
+    persistSelectedSumIds();
+  } catch (error) {
+    console.error(error);
+    state.syncFeedback = isCloudMode() ? "The cloud order could not be updated right now." : "The row order could not be updated right now.";
+  } finally {
+    state.isBusy = false;
+    render();
+  }
 }
 
 function handleDragStart(event) {
@@ -469,7 +844,7 @@ function handleDragOver(event) {
   };
 }
 
-function handleDrop(event) {
+async function handleDrop(event) {
   event.preventDefault();
 
   if (!state.dragId || !state.dragPosition) {
@@ -493,11 +868,28 @@ function handleDrop(event) {
       : targetIndex + (state.dragPosition.placeAfter ? 1 : 0);
 
   reordered.splice(insertIndex, 0, draggedEntry);
+  const movedEntry = reordered[insertIndex];
+  movedEntry.sortOrder = getSortOrderBetween(reordered[insertIndex - 1], reordered[insertIndex + 1]);
   state.entries = reordered;
-  persistEntries();
-  persistSelectedSumIds();
   clearDragMarkers();
+  state.isBusy = true;
   render();
+
+  try {
+    if (isCloudMode()) {
+      await persistCloudEntries([movedEntry]);
+    } else {
+      setLocalEntries(state.entries);
+    }
+
+    persistSelectedSumIds();
+  } catch (error) {
+    console.error(error);
+    state.syncFeedback = isCloudMode() ? "The cloud row order could not be updated right now." : "The row order could not be updated right now.";
+  } finally {
+    state.isBusy = false;
+    render();
+  }
 }
 
 function handleSumConsoleAction(event) {
@@ -519,7 +911,7 @@ function handleSumConsoleAction(event) {
   render();
 }
 
-function handleBulkConsoleAction(event) {
+async function handleBulkConsoleAction(event) {
   const button = event.target.closest("[data-bulk-action]");
   if (!button) {
     return;
@@ -540,12 +932,12 @@ function handleBulkConsoleAction(event) {
   }
 
   if (action === "delete-selected") {
-    deleteSelectedEntries();
+    await deleteSelectedEntries();
     return;
   }
 
   if (action === "delete-all") {
-    deleteAllEntries();
+    await deleteAllEntries();
   }
 }
 
@@ -584,7 +976,9 @@ function startSplitEntry(entryId = state.editingId) {
   state.splitSourceId = sourceId;
   fillSplitEditorFields(sourceEntry);
   formStatus.textContent =
-    "Split mode is active. Edit both entries and save them back into the original row position.";
+    isCloudMode()
+      ? "Split mode is active. Edit both cloud rows and save them back into the original position."
+      : "Split mode is active. Edit both entries and save them back into the original row position.";
   render();
   scrollEditorIntoView();
 }
@@ -597,14 +991,16 @@ function cancelSplitEntry() {
   state.splitSourceId = null;
   clearSplitEditorFields();
   formStatus.textContent = state.editingId
-    ? "Editing an existing row. Save to update the ledger in place."
-    : "New entries are saved to this browser automatically.";
+    ? isCloudMode()
+      ? "Editing a cloud row. Save to update your private synced logbook."
+      : "Editing an existing row. Save to update the ledger in place."
+    : getDefaultFormStatus();
   render();
 }
 
-function deleteSelectedEntries() {
+async function deleteSelectedEntries() {
   const selectedEntries = state.entries.filter((entry) => state.selectedDeleteIds.has(entry.id));
-  if (!selectedEntries.length) {
+  if (!selectedEntries.length || state.isBusy) {
     return;
   }
 
@@ -618,23 +1014,38 @@ function deleteSelectedEntries() {
   }
 
   const selectedIds = new Set(selectedEntries.map((entry) => entry.id));
-  state.entries = state.entries.filter((entry) => !selectedIds.has(entry.id));
-  state.selectedDeleteIds = new Set();
-  state.selectedSumIds = new Set(
-    [...state.selectedSumIds].filter((entryId) => !selectedIds.has(entryId))
-  );
-
-  if (state.editingId && selectedIds.has(state.editingId)) {
-    resetEditorState();
-  }
-
-  persistEntries();
-  persistSelectedSumIds();
+  state.isBusy = true;
   render();
+
+  try {
+    state.entries = state.entries.filter((entry) => !selectedIds.has(entry.id));
+    state.selectedDeleteIds = new Set();
+    state.selectedSumIds = new Set(
+      [...state.selectedSumIds].filter((entryId) => !selectedIds.has(entryId))
+    );
+
+    if (state.editingId && selectedIds.has(state.editingId)) {
+      resetEditorState();
+    }
+
+    if (isCloudMode()) {
+      await deleteUserEntries(state.user.uid, [...selectedIds]);
+    } else {
+      setLocalEntries(state.entries);
+    }
+
+    persistSelectedSumIds();
+  } catch (error) {
+    console.error(error);
+    state.syncFeedback = isCloudMode() ? "Selected cloud entries could not be deleted right now." : "Selected entries could not be deleted right now.";
+  } finally {
+    state.isBusy = false;
+    render();
+  }
 }
 
-function deleteAllEntries() {
-  if (!state.entries.length) {
+async function deleteAllEntries() {
+  if (!state.entries.length || state.isBusy) {
     return;
   }
 
@@ -642,17 +1053,33 @@ function deleteAllEntries() {
     return;
   }
 
-  state.entries = [];
-  state.selectedDeleteIds = new Set();
-  state.selectedSumIds = new Set();
-  resetEditorState();
-
-  persistEntries();
-  persistSelectedSumIds();
+  state.isBusy = true;
   render();
+
+  try {
+    const entryIds = state.entries.map((entry) => entry.id);
+    state.entries = [];
+    state.selectedDeleteIds = new Set();
+    state.selectedSumIds = new Set();
+    resetEditorState();
+
+    if (isCloudMode()) {
+      await deleteUserEntries(state.user.uid, entryIds);
+    } else {
+      setLocalEntries([]);
+    }
+
+    persistSelectedSumIds();
+  } catch (error) {
+    console.error(error);
+    state.syncFeedback = isCloudMode() ? "Cloud entries could not be fully cleared right now." : "Entries could not be fully cleared right now.";
+  } finally {
+    state.isBusy = false;
+    render();
+  }
 }
 
-function saveSplitEntries(primaryEntry, secondaryEntry) {
+async function saveSplitEntries(primaryEntry, secondaryEntry) {
   const sourceIndex = state.entries.findIndex((item) => item.id === state.splitSourceId);
   const sourceEntry = state.entries[sourceIndex];
   if (sourceIndex < 0 || !sourceEntry) {
@@ -663,18 +1090,19 @@ function saveSplitEntries(primaryEntry, secondaryEntry) {
   const secondEntryId = createId();
   const shouldCarrySum = state.selectedSumIds.has(sourceEntry.id);
   const shouldCarryBulk = state.selectedDeleteIds.has(sourceEntry.id);
-  const firstEntry = {
+  const firstEntry = normalizeStoredEntry({
     ...sourceEntry,
     ...primaryEntry,
     updatedAt: timestamp,
-  };
-  const secondEntry = {
+  });
+  const secondEntry = normalizeStoredEntry({
     ...sourceEntry,
     ...secondaryEntry,
     id: secondEntryId,
     createdAt: timestamp,
     updatedAt: timestamp,
-  };
+    sortOrder: getSortOrderBetween(firstEntry, state.entries[sourceIndex + 1]),
+  });
 
   const reorderedEntries = [...state.entries];
   reorderedEntries.splice(sourceIndex, 1, firstEntry, secondEntry);
@@ -693,10 +1121,25 @@ function saveSplitEntries(primaryEntry, secondaryEntry) {
   }
 
   resetEditorState();
-  persistEntries();
-  persistSelectedSumIds();
+  state.isBusy = true;
   render();
-  revealLedgerEntry(firstEntry.id);
+
+  try {
+    if (isCloudMode()) {
+      await persistCloudEntries([firstEntry, secondEntry]);
+    } else {
+      setLocalEntries(state.entries);
+    }
+
+    persistSelectedSumIds();
+    revealLedgerEntry(firstEntry.id);
+  } catch (error) {
+    console.error(error);
+    state.syncFeedback = isCloudMode() ? "The cloud split could not be saved right now." : "The split could not be saved right now.";
+  } finally {
+    state.isBusy = false;
+    render();
+  }
 }
 
 function clearDragMarkers() {
@@ -716,6 +1159,7 @@ function resetDropMarkers() {
 
 function render() {
   renderSummary();
+  renderSyncConsole();
   renderEditorMode();
   renderSumConsole();
   renderBulkConsole();
@@ -764,8 +1208,41 @@ function renderSummary() {
   summaryMeDual.textContent = formatTotal(totals.meDual);
 }
 
+function renderSyncConsole() {
+  const hasDeviceEntries = state.localEntries.length > 0;
+  const isSignedIn = Boolean(state.user);
+
+  storageModeValue.textContent = isCloudMode()
+    ? "Private cloud sync"
+    : isSignedIn
+      ? "Signed in · using device copy"
+      : "Local browser vault";
+  authStatus.textContent = !state.authResolved
+    ? "Checking sign-in status..."
+    : isSignedIn
+      ? `Signed in as ${state.user.displayName || state.user.email || "Google user"}.`
+      : "Guest mode: entries stay on this device only.";
+  syncMessage.textContent = isCloudMode()
+    ? `Cloud sync is active. This device still has ${state.localEntries.length} guest entr${state.localEntries.length === 1 ? "y" : "ies"} available for import at any time.`
+    : isSignedIn
+      ? "Your Google account is connected, but cloud data is not available right now. You can still use the device copy and try again later."
+      : "Sign in with Google to sync your logbook across devices. You can keep testing in guest mode first.";
+  syncFeedback.textContent = state.syncFeedback;
+
+  signInButton.hidden = isSignedIn;
+  signOutButton.hidden = !isSignedIn;
+  signInButton.disabled = state.isBusy;
+  signOutButton.disabled = state.isBusy;
+  importLocalButton.disabled = state.isBusy || !isCloudMode() || !hasDeviceEntries;
+}
+
 function renderManifest() {
   emptyState.hidden = state.entries.length > 0;
+  manifestStatus.textContent = isCloudMode()
+    ? "Cloud rows are private to the signed-in pilot account. Drag cards to reorder the synced ledger."
+    : state.user
+      ? "Cloud data is unavailable right now, so you are viewing the device copy."
+      : "Drag cards to reorder the printed ledger rows on this device.";
   entryList.innerHTML = state.entries
     .map((entry, index) => createEntryCard(entry, index))
     .join("");
@@ -788,8 +1265,8 @@ function renderBulkConsole() {
   deleteSelectedButton.textContent = selectedRows
     ? `Delete selected (${selectedRows})`
     : "Delete selected";
-  deleteSelectedButton.disabled = selectedRows === 0;
-  deleteAllButton.disabled = totalRows === 0;
+  deleteSelectedButton.disabled = selectedRows === 0 || state.isBusy;
+  deleteAllButton.disabled = totalRows === 0 || state.isBusy;
 }
 
 function renderSumConsole() {
@@ -826,17 +1303,20 @@ function renderEditorMode() {
   if (isSplitMode) {
     formTitle.textContent = "Split flight entry";
     saveButton.textContent = "Save split entries";
-    return;
-  }
-
-  if (isEditMode) {
+  } else if (isEditMode) {
     formTitle.textContent = "Edit flight entry";
     saveButton.textContent = "Update entry";
-    return;
+  } else {
+    formTitle.textContent = "Add a flight entry";
+    saveButton.textContent = "Save entry";
   }
 
-  formTitle.textContent = "Add a flight entry";
-  saveButton.textContent = "Save entry";
+  saveButton.disabled = state.isBusy;
+  splitEntryButton.disabled = state.isBusy;
+  cancelSplitButton.disabled = state.isBusy;
+  deleteEntryButton.disabled = state.isBusy;
+  resetFormButton.disabled = state.isBusy;
+  printButton.disabled = state.isBusy;
 }
 
 function renderLedgerMode() {
@@ -1262,10 +1742,6 @@ function loadDisplayPreferences() {
   }
 }
 
-function persistEntries() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state.entries));
-}
-
 function persistSelectedSumIds() {
   const orderedSelection = state.entries
     .map((entry) => entry.id)
@@ -1315,6 +1791,10 @@ function clearSplitEditorFields() {
 }
 
 function toggleBulkSelection(entryId, forceState, options = {}) {
+  if (state.isBusy) {
+    return;
+  }
+
   const ledgerView = options.preserveLedgerView ? captureLedgerView() : null;
   const shouldSelect =
     typeof forceState === "boolean" ? forceState : !state.selectedDeleteIds.has(entryId);
@@ -1333,6 +1813,10 @@ function toggleBulkSelection(entryId, forceState, options = {}) {
 }
 
 function toggleSumSelection(entryId, options = {}) {
+  if (state.isBusy) {
+    return;
+  }
+
   const ledgerView = options.preserveLedgerView ? captureLedgerView() : null;
 
   if (state.selectedSumIds.has(entryId)) {
