@@ -10,6 +10,21 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && request.resource.data.uid == userId
+        && request.resource.data.keys().hasOnly([
+          'uid',
+          'displayName',
+          'email',
+          'photoURL',
+          'providerId',
+          'lastSeenAt'
+        ]);
+      allow delete: if false;
+    }
+
     match /users/{userId}/entries/{entryId} {
       allow read, list: if isOwner(userId);
       allow create, update: if isOwner(userId)

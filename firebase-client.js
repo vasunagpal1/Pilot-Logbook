@@ -16,6 +16,7 @@ import {
   getFirestore,
   orderBy,
   query,
+  setDoc,
   writeBatch,
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 
@@ -96,6 +97,28 @@ export async function signInWithGooglePopup() {
 export async function signOutCurrentUser() {
   const { auth } = await getFirebaseServices();
   return signOut(auth);
+}
+
+export async function upsertUserProfile(user) {
+  if (!user?.uid) {
+    return;
+  }
+
+  const { db } = await getFirebaseServices();
+  const profileRef = doc(db, "users", user.uid);
+
+  await setDoc(
+    profileRef,
+    {
+      uid: user.uid,
+      displayName: user.displayName || "",
+      email: user.email || "",
+      photoURL: user.photoURL || "",
+      providerId: user.providerData?.[0]?.providerId || "google.com",
+      lastSeenAt: new Date().toISOString(),
+    },
+    { merge: true }
+  );
 }
 
 export async function loadUserEntries(uid) {

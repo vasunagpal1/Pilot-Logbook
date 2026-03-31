@@ -5,6 +5,7 @@ import {
   signInWithGooglePopup,
   signOutCurrentUser,
   subscribeToAuthState,
+  upsertUserProfile,
   upsertUserEntries,
 } from "./firebase-client.js";
 
@@ -255,6 +256,7 @@ async function handleAuthStateChange(user) {
   render();
 
   try {
+    await upsertUserProfile(user);
     const cloudEntries = await loadCloudEntriesForCurrentUser();
     applyEntries(cloudEntries);
     state.syncFeedback = cloudEntries.length
