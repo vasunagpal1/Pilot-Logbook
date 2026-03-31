@@ -175,6 +175,9 @@ const deleteAllButton = document.querySelector("#delete-all");
 const signInButton = document.querySelector("#sign-in-button");
 const signOutButton = document.querySelector("#sign-out-button");
 const importLocalButton = document.querySelector("#import-local-button");
+const exportDataButton = document.querySelector("#export-data-button");
+const importFileButton = document.querySelector("#import-file-button");
+const importFileInput = document.querySelector("#import-file-input");
 const authStatus = document.querySelector("#auth-status");
 const syncMessage = document.querySelector("#sync-message");
 const syncFeedback = document.querySelector("#sync-feedback");
@@ -201,6 +204,9 @@ function bindEvents() {
   signInButton.addEventListener("click", handleSignIn);
   signOutButton.addEventListener("click", handleSignOut);
   importLocalButton.addEventListener("click", handleImportLocalToCloud);
+  exportDataButton.addEventListener("click", handleExportData);
+  importFileButton.addEventListener("click", () => importFileInput.click());
+  importFileInput.addEventListener("change", handleImportFileSelection);
 
   entryList.addEventListener("click", handleEntryCardAction);
   entryList.addEventListener("change", handleEntrySelectionChange);
@@ -352,6 +358,99 @@ async function handleImportLocalToCloud() {
   }
 }
 
+function handleExportData() {
+  if (state.isBusy) {
+    return;
+  }
+
+  const payload = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    mode: isCloudMode() ? "cloud" : "guest",
+    entries: state.entries.map(serializeEntryForCloud),
+    selectedSumIds: state.entries
+      .map((entry) => entry.id)
+      .filter((entryId) => state.selectedSumIds.has(entryId)),
+    displayPreferences: {
+      hideZeroValues: state.hideZeroValues,
+      hideEmptyColumns: state.hideEmptyColumns,
+    },
+  };
+
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const downloadLink = document.createElement("a");
+  downloadLink.href = url;
+  downloadLink.download = `pilot-logbook-backup-${formatDateInput(new Date())}.json`;
+  document.body.append(downloadLink);
+  downloadLink.click();
+  downloadLink.remove();
+  URL.revokeObjectURL(url);
+  state.syncFeedback = "Backup downloaded from the current table data.";
+  render();
+}
+
+async function handleImportFileSelection(event) {
+  const file = event.target.files?.[0];
+  importFileInput.value = "";
+
+  if (!file || state.isBusy) {
+    return;
+  }
+
+  try {
+    const raw = await file.text();
+    const parsed = JSON.parse(raw);
+    const importedEntries = parseImportedEntries(parsed);
+    if (!importedEntries.length && parsed?.entries && Array.isArray(parsed.entries) && parsed.entries.length) {
+      throw new Error("No valid entries were found in this backup.");
+    }
+
+    const selectedSumIds = parseImportedSelectedSumIds(parsed, importedEntries);
+    const displayPreferences = parseImportedDisplayPreferences(parsed);
+
+    const targetLabel = isCloudMode() ? "cloud logbook" : "device logbook";
+    if (!window.confirm(`Replace the current ${targetLabel} with ${importedEntries.length} imported entr${importedEntries.length === 1 ? "y" : "ies"} from this backup file?`)) {
+      return;
+    }
+
+    state.isBusy = true;
+    render();
+
+    if (isCloudMode()) {
+      const currentIds = new Set(state.entries.map((entry) => entry.id));
+      const importedIds = new Set(importedEntries.map((entry) => entry.id));
+      const idsToDelete = [...currentIds].filter((entryId) => !importedIds.has(entryId));
+
+      if (idsToDelete.length) {
+        await deleteUserEntries(state.user.uid, idsToDelete);
+      }
+
+      if (importedEntries.length) {
+        await upsertUserEntries(state.user.uid, importedEntries.map(serializeEntryForCloud));
+      }
+    } else {
+      setLocalEntries(importedEntries);
+    }
+
+    applyEntries(importedEntries);
+    state.selectedDeleteIds = new Set();
+    state.selectedSumIds = new Set(selectedSumIds);
+    state.hideZeroValues = displayPreferences.hideZeroValues;
+    state.hideEmptyColumns = displayPreferences.hideEmptyColumns;
+    persistSelectedSumIds();
+    persistDisplayPreferences();
+    resetEditorState();
+    state.syncFeedback = `Imported ${importedEntries.length} entr${importedEntries.length === 1 ? "y" : "ies"} from backup into the current table.`;
+  } catch (error) {
+    console.error(error);
+    state.syncFeedback = "That backup file could not be imported. Please use a valid JSON export from this app.";
+  } finally {
+    state.isBusy = false;
+    render();
+  }
+}
+
 function isCloudMode() {
   return Boolean(state.user) && state.storageMode === "cloud";
 }
@@ -456,6 +555,27 @@ function buildImportedEntries(localEntries, cloudEntries) {
 
     return imports;
   }, []);
+}
+
+function parseImportedEntries(payload) {
+  const sourceEntries = Array.isArray(payload) ? payload : Array.isArray(payload?.entries) ? payload.entries : [];
+
+  return sourceEntries
+    .map((entry, index) => normalizeStoredEntry(entry, index))
+    .sort((firstEntry, secondEntry) => getEntrySortOrder(firstEntry) - getEntrySortOrder(secondEntry));
+}
+
+function parseImportedSelectedSumIds(payload, entries) {
+  const selectedIds = Array.isArray(payload?.selectedSumIds) ? payload.selectedSumIds : entries.map((entry) => entry.id);
+  const validIds = new Set(entries.map((entry) => entry.id));
+  return selectedIds.filter((entryId) => validIds.has(entryId));
+}
+
+function parseImportedDisplayPreferences(payload) {
+  return {
+    hideZeroValues: Boolean(payload?.displayPreferences?.hideZeroValues),
+    hideEmptyColumns: Boolean(payload?.displayPreferences?.hideEmptyColumns),
+  };
 }
 
 function createTopSortOrder(entries) {
@@ -1233,6 +1353,8 @@ function renderSyncConsole() {
   signOutButton.hidden = !isSignedIn;
   signInButton.disabled = state.isBusy;
   signOutButton.disabled = state.isBusy;
+  exportDataButton.disabled = state.isBusy || state.entries.length === 0;
+  importFileButton.disabled = state.isBusy;
   importLocalButton.disabled = state.isBusy || !isCloudMode() || !hasDeviceEntries;
 }
 
