@@ -191,7 +191,7 @@ async function boot() {
   bindEvents();
   seedDefaultDate();
   render();
-  subscribeToAuthState(handleAuthStateChange);
+  await subscribeToAuthState(handleAuthStateChange);
 }
 
 function bindEvents() {
@@ -288,6 +288,8 @@ async function handleSignIn() {
     console.error(error);
     state.syncFeedback = error?.code === "auth/popup-closed-by-user"
       ? "Google sign-in was closed before finishing."
+      : /Firebase config is not available|Firebase config is incomplete/i.test(String(error))
+        ? "Cloud sign-in is only available from the Firebase-hosted site right now."
       : "Google sign-in could not be completed right now.";
   } finally {
     state.isBusy = false;
