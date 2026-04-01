@@ -115,6 +115,7 @@ body::before {
 
 .sync-console__status,
 .sync-console__hint,
+.sync-console__summary,
 .sync-console__feedback {
   margin: 0;
 }
@@ -125,10 +126,18 @@ body::before {
 }
 
 .sync-console__hint,
+.sync-console__summary,
 .sync-console__feedback {
   color: rgba(255, 255, 255, 0.72);
   font-size: 0.82rem;
   line-height: 1.35;
+}
+
+.sync-console__summary {
+  color: var(--mint);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.76rem;
+  letter-spacing: 0.02em;
 }
 
 .sync-console__actions {

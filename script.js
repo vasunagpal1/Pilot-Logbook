@@ -183,6 +183,7 @@ const importFileButton = document.querySelector("#import-file-button");
 const importFileInput = document.querySelector("#import-file-input");
 const authStatus = document.querySelector("#auth-status");
 const syncMessage = document.querySelector("#sync-message");
+const syncSummary = document.querySelector("#sync-summary");
 const syncFeedback = document.querySelector("#sync-feedback");
 const ledgerColgroupMarkup = ledgerTable.querySelector("colgroup").outerHTML;
 const ledgerHeadMarkup = ledgerTable.querySelector("thead").outerHTML;
@@ -1387,7 +1388,10 @@ function renderSyncConsole() {
   const hasDeviceEntries = state.localEntries.length > 0;
   const isSignedIn = Boolean(state.user);
   const pendingLocalImports = getPendingLocalImports();
+  const deviceEntryCount = state.localEntries.length;
+  const cloudEntryCount = isCloudMode() ? state.entries.length : 0;
   let importLocalButtonLabel = "Import device data to cloud";
+  let syncSummaryText = "";
 
   if (!hasDeviceEntries) {
     importLocalButtonLabel = "No device entries to import";
@@ -1399,6 +1403,14 @@ function renderSyncConsole() {
     importLocalButtonLabel = "Device data already in cloud";
   } else {
     importLocalButtonLabel = `Import ${pendingLocalImports.length} device entr${pendingLocalImports.length === 1 ? "y" : "ies"} to cloud`;
+  }
+
+  if (isCloudMode()) {
+    syncSummaryText = `${cloudEntryCount} cloud entr${cloudEntryCount === 1 ? "y" : "ies"} • ${pendingLocalImports.length} pending from this device`;
+  } else if (isSignedIn) {
+    syncSummaryText = `${deviceEntryCount} device entr${deviceEntryCount === 1 ? "y" : "ies"} • cloud temporarily unavailable`;
+  } else {
+    syncSummaryText = `${deviceEntryCount} device entr${deviceEntryCount === 1 ? "y" : "ies"} • sign in to start cloud sync`;
   }
 
   storageModeValue.textContent = isCloudMode()
@@ -1418,6 +1430,7 @@ function renderSyncConsole() {
     : isSignedIn
       ? "Your Google account is connected, but cloud data is not available right now. You can still use the device copy and try again later."
       : "Sign in with Google to sync your logbook across devices. You can keep testing in guest mode first.";
+  syncSummary.textContent = syncSummaryText;
   syncFeedback.textContent = state.syncFeedback;
 
   signInButton.hidden = isSignedIn;
