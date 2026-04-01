@@ -12,6 +12,7 @@ import {
 const STORAGE_KEY = "pilot-logbook-atelier-v1";
 const SUM_SELECTION_KEY = "pilot-logbook-atelier-sum-selection-v1";
 const DISPLAY_PREFERENCES_KEY = "pilot-logbook-display-preferences-v1";
+const IMPORTED_LOCAL_IDS_KEY = "pilot-logbook-atelier-imported-local-ids-v1";
 const SPLIT_FIELD_PREFIX = "split__";
 const PRINT_PAGE_ENTRY_LIMIT = 18;
 const PRINT_PAGE_MIN_BLANK_ROWS = 6;
@@ -118,6 +119,7 @@ const state = {
   localEntries: initialLocalEntries,
   selectedSumIds: new Set(loadSelectedSumIds(initialLocalEntries)),
   selectedDeleteIds: new Set(),
+  importedLocalIds: new Set(loadImportedLocalIds(initialLocalEntries)),
   editingId: null,
   splitSourceId: null,
   ledgerInteractionMode: "edit",
@@ -258,6 +260,7 @@ async function handleAuthStateChange(user) {
   try {
     await upsertUserProfile(user);
     const cloudEntries = await loadCloudEntriesForCurrentUser();
+    syncImportedLocalIdsWithCloud(cloudEntries);
     applyEntries(cloudEntries);
     state.syncFeedback = cloudEntries.length
       ? "Cloud sync is active."
@@ -335,14 +338,15 @@ async function handleImportLocalToCloud() {
     return;
   }
 
-  const importedEntries = buildImportedEntries(state.localEntries, state.entries);
-  if (!importedEntries.length) {
-    state.syncFeedback = "This device's entries are already present in your cloud logbook.";
+  const pendingLocalImports = getPendingLocalImports();
+  if (!pendingLocalImports.length) {
+    state.syncFeedback = "This device's entries are already represented in your cloud logbook.";
     render();
     return;
   }
 
-  if (!window.confirm(`Import ${importedEntries.length} device entr${importedEntries.length === 1 ? "y" : "ies"} into your cloud logbook? Existing cloud entries will stay in place.`)) {
+  const importedEntries = buildImportedEntries(pendingLocalImports, state.entries);
+  if (!window.confirm(`Import ${importedEntries.length} new device entr${importedEntries.length === 1 ? "y" : "ies"} into your cloud logbook? Existing cloud entries will stay in place.`)) {
     return;
   }
 
@@ -351,8 +355,9 @@ async function handleImportLocalToCloud() {
 
   try {
     await upsertUserEntries(state.user.uid, importedEntries.map(serializeEntryForCloud));
+    markLocalEntriesAsImported(state.localEntries);
     applyEntries([...state.entries, ...importedEntries]);
-    state.syncFeedback = `Imported ${importedEntries.length} device entr${importedEntries.length === 1 ? "y" : "ies"} into cloud.`;
+    state.syncFeedback = `Imported ${importedEntries.length} new device entr${importedEntries.length === 1 ? "y" : "ies"} into cloud.`;
   } catch (error) {
     console.error(error);
     state.syncFeedback = "Import could not be completed right now.";
@@ -434,7 +439,7 @@ async function handleImportFileSelection(event) {
         await upsertUserEntries(state.user.uid, importedEntries.map(serializeEntryForCloud));
       }
     } else {
-      setLocalEntries(importedEntries);
+      setLocalEntries(importedEntries, { resetImportedIds: true });
     }
 
     applyEntries(importedEntries);
@@ -518,24 +523,44 @@ function persistLocalEntries() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.localEntries));
 }
 
-function setLocalEntries(entries) {
+function setLocalEntries(entries, options = {}) {
   state.localEntries = entries.map((entry, index) => normalizeStoredEntry(entry, index));
+  if (options.resetImportedIds) {
+    state.importedLocalIds = new Set();
+  } else {
+    state.importedLocalIds = new Set(
+      [...state.importedLocalIds].filter((entryId) => state.localEntries.some((entry) => entry.id === entryId))
+    );
+  }
   persistLocalEntries();
+  persistImportedLocalIds();
 }
 
 function buildEntryFingerprint(entry) {
   return ENTRY_FIELDS.map((field) => String(entry[field] ?? "").trim()).join("||");
 }
 
-function buildImportedEntries(localEntries, cloudEntries) {
+function getPendingLocalImports() {
+  if (!isCloudMode()) {
+    return [];
+  }
+
+  return getImportableLocalEntries(state.localEntries, state.entries, state.importedLocalIds);
+}
+
+function getImportableLocalEntries(localEntries, cloudEntries, importedLocalIds = new Set()) {
+  const cloudIds = new Set(cloudEntries.map((entry) => entry.id));
   const cloudFingerprintCounts = cloudEntries.reduce((counts, entry) => {
     const fingerprint = buildEntryFingerprint(entry);
     counts.set(fingerprint, (counts.get(fingerprint) || 0) + 1);
     return counts;
   }, new Map());
-  let tailSortOrder = cloudEntries.length ? getEntrySortOrder(cloudEntries[cloudEntries.length - 1]) : 0;
 
   return localEntries.reduce((imports, localEntry) => {
+    if (importedLocalIds.has(localEntry.id) || cloudIds.has(localEntry.id)) {
+      return imports;
+    }
+
     const fingerprint = buildEntryFingerprint(localEntry);
     const remainingCloudCount = cloudFingerprintCounts.get(fingerprint) || 0;
     if (remainingCloudCount > 0) {
@@ -543,14 +568,40 @@ function buildImportedEntries(localEntries, cloudEntries) {
       return imports;
     }
 
+    imports.push(localEntry);
+    return imports;
+  }, []);
+}
+
+function markLocalEntriesAsImported(entries) {
+  entries.forEach((entry) => {
+    if (entry.id) {
+      state.importedLocalIds.add(entry.id);
+    }
+  });
+
+  persistImportedLocalIds();
+}
+
+function syncImportedLocalIdsWithCloud(cloudEntries) {
+  const pendingWithoutMarker = getImportableLocalEntries(state.localEntries, cloudEntries, new Set());
+  if (state.localEntries.length && pendingWithoutMarker.length === 0) {
+    markLocalEntriesAsImported(state.localEntries);
+  }
+}
+
+function buildImportedEntries(localEntries, cloudEntries) {
+  let tailSortOrder = cloudEntries.length ? getEntrySortOrder(cloudEntries[cloudEntries.length - 1]) : 0;
+
+  return localEntries.reduce((imports, localEntry) => {
     tailSortOrder += 1024;
     imports.push(
       normalizeStoredEntry(
         {
           ...localEntry,
-          id: createId(),
+          id: localEntry.id || createId(),
           createdAt: localEntry.createdAt || new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
+          updatedAt: localEntry.updatedAt || new Date().toISOString(),
           sortOrder: tailSortOrder,
         },
         cloudEntries.length + imports.length
@@ -1335,6 +1386,20 @@ function renderSummary() {
 function renderSyncConsole() {
   const hasDeviceEntries = state.localEntries.length > 0;
   const isSignedIn = Boolean(state.user);
+  const pendingLocalImports = getPendingLocalImports();
+  let importLocalButtonLabel = "Import device data to cloud";
+
+  if (!hasDeviceEntries) {
+    importLocalButtonLabel = "No device entries to import";
+  } else if (!isCloudMode()) {
+    importLocalButtonLabel = isSignedIn
+      ? "Cloud sync unavailable right now"
+      : "Sign in to import device data";
+  } else if (!pendingLocalImports.length) {
+    importLocalButtonLabel = "Device data already in cloud";
+  } else {
+    importLocalButtonLabel = `Import ${pendingLocalImports.length} device entr${pendingLocalImports.length === 1 ? "y" : "ies"} to cloud`;
+  }
 
   storageModeValue.textContent = isCloudMode()
     ? "Private cloud sync"
@@ -1347,7 +1412,9 @@ function renderSyncConsole() {
       ? `Signed in as ${state.user.displayName || state.user.email || "Google user"}.`
       : "Guest mode: entries stay on this device only.";
   syncMessage.textContent = isCloudMode()
-    ? `Cloud sync is active. This device still has ${state.localEntries.length} guest entr${state.localEntries.length === 1 ? "y" : "ies"} available for import at any time.`
+    ? pendingLocalImports.length
+      ? `Cloud sync is active. This device has ${pendingLocalImports.length} guest entr${pendingLocalImports.length === 1 ? "y" : "ies"} not yet in cloud.`
+      : "Cloud sync is active. This device copy is already represented in cloud."
     : isSignedIn
       ? "Your Google account is connected, but cloud data is not available right now. You can still use the device copy and try again later."
       : "Sign in with Google to sync your logbook across devices. You can keep testing in guest mode first.";
@@ -1359,7 +1426,8 @@ function renderSyncConsole() {
   signOutButton.disabled = state.isBusy;
   exportDataButton.disabled = state.isBusy || state.entries.length === 0;
   importFileButton.disabled = state.isBusy;
-  importLocalButton.disabled = state.isBusy || !isCloudMode() || !hasDeviceEntries;
+  importLocalButton.disabled = state.isBusy || !isCloudMode() || !hasDeviceEntries || pendingLocalImports.length === 0;
+  importLocalButton.textContent = importLocalButtonLabel;
 }
 
 function renderManifest() {
@@ -1884,6 +1952,31 @@ function persistDisplayPreferences() {
       hideEmptyColumns: state.hideEmptyColumns,
     })
   );
+}
+
+function loadImportedLocalIds(entries) {
+  try {
+    const raw = localStorage.getItem(IMPORTED_LOCAL_IDS_KEY);
+    if (!raw) {
+      return [];
+    }
+
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    const entryIds = new Set(entries.map((entry) => entry.id));
+    return parsed.filter((entryId) => entryIds.has(entryId));
+  } catch (error) {
+    return [];
+  }
+}
+
+function persistImportedLocalIds() {
+  const validIds = new Set(state.localEntries.map((entry) => entry.id));
+  const orderedImportedIds = [...state.importedLocalIds].filter((entryId) => validIds.has(entryId));
+  localStorage.setItem(IMPORTED_LOCAL_IDS_KEY, JSON.stringify(orderedImportedIds));
 }
 
 function getSelectedEntries() {
