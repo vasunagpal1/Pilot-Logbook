@@ -146,6 +146,29 @@ body::before {
   gap: 10px;
 }
 
+.history-console {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.history-console__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.history-console__status {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.76rem;
+  line-height: 1.3;
+  text-align: right;
+}
+
 .eyebrow,
 .panel-kicker,
 .paper-label {
@@ -1215,9 +1238,14 @@ body::before {
   .section-header,
   .sum-console,
   .bulk-console,
-  .sync-console__actions {
+  .sync-console__actions,
+  .history-console {
     align-items: start;
     flex-direction: column;
+  }
+
+  .history-console__status {
+    text-align: left;
   }
 
   .form-grid--two {

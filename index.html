@@ -43,6 +43,15 @@
             <button type="button" class="button button-ghost" id="import-file-button">Upload backup</button>
             <input id="import-file-input" type="file" accept="application/json,.json" hidden />
           </div>
+          <div class="history-console" aria-label="Undo and redo controls">
+            <div class="history-console__actions">
+              <button type="button" class="button button-ghost" id="undo-button">Undo</button>
+              <button type="button" class="button button-ghost" id="redo-button">Redo</button>
+            </div>
+            <p id="history-status" class="history-console__status">
+              Session undo is ready. New saved changes will appear here.
+            </p>
+          </div>
           <p id="sync-feedback" class="sync-console__feedback" aria-live="polite"></p>
         </section>
       </div>

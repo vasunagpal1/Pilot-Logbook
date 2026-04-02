@@ -16,6 +16,7 @@ const IMPORTED_LOCAL_IDS_KEY = "pilot-logbook-atelier-imported-local-ids-v1";
 const SPLIT_FIELD_PREFIX = "split__";
 const PRINT_PAGE_ENTRY_LIMIT = 18;
 const PRINT_PAGE_MIN_BLANK_ROWS = 6;
+const HISTORY_LIMIT = 50;
 const REQUIRED_FIELDS = ["date", "type", "registration", "pilotInCommand"];
 const ALL_LEDGER_COLUMN_INDICES = Array.from({ length: 32 }, (_, index) => index + 1);
 const HEADER_SPAN_MAP = {
@@ -136,6 +137,11 @@ const state = {
   syncFeedback: "",
 };
 
+const historyState = {
+  undoStack: [],
+  redoStack: [],
+};
+
 const form = document.querySelector("#entry-form");
 const entryStage = document.querySelector(".entry-stage");
 const entryFormScroll = document.querySelector("#entry-form-scroll");
@@ -183,6 +189,9 @@ const importLocalButton = document.querySelector("#import-local-button");
 const exportDataButton = document.querySelector("#export-data-button");
 const importFileButton = document.querySelector("#import-file-button");
 const importFileInput = document.querySelector("#import-file-input");
+const undoButton = document.querySelector("#undo-button");
+const redoButton = document.querySelector("#redo-button");
+const historyStatus = document.querySelector("#history-status");
 const authStatus = document.querySelector("#auth-status");
 const syncMessage = document.querySelector("#sync-message");
 const syncSummary = document.querySelector("#sync-summary");
@@ -213,6 +222,8 @@ function bindEvents() {
   exportDataButton.addEventListener("click", handleExportData);
   importFileButton.addEventListener("click", () => importFileInput.click());
   importFileInput.addEventListener("change", handleImportFileSelection);
+  undoButton.addEventListener("click", () => undoHistory());
+  redoButton.addEventListener("click", () => redoHistory());
 
   entryList.addEventListener("click", handleEntryCardAction);
   entryList.addEventListener("click", handleEntrySelectionIntent, true);
@@ -227,6 +238,7 @@ function bindEvents() {
   ledgerScroller.addEventListener("scroll", syncStickyLedgerHeaderOffsets);
   hideZeroValuesToggle.addEventListener("change", handleDisplayPreferenceChange);
   hideEmptyColumnsToggle.addEventListener("change", handleDisplayPreferenceChange);
+  document.addEventListener("keydown", handleHistoryShortcut);
   window.addEventListener("resize", syncStickyLedgerHeaderOffsets);
 
   ledgerBody.addEventListener("click", (event) => {
@@ -247,6 +259,7 @@ function bindEvents() {
 async function handleAuthStateChange(user) {
   state.user = user ?? null;
   state.authResolved = true;
+  clearSessionHistory();
 
   if (!user) {
     state.storageMode = "guest";
@@ -354,6 +367,7 @@ async function handleImportLocalToCloud() {
     return;
   }
 
+  const beforeSnapshot = createHistorySnapshot();
   state.isBusy = true;
   render();
 
@@ -361,9 +375,15 @@ async function handleImportLocalToCloud() {
     await upsertUserEntries(state.user.uid, importedEntries.map(serializeEntryForCloud));
     markLocalEntriesAsImported(state.localEntries);
     applyEntries([...state.entries, ...importedEntries]);
+    recordHistoryEntry(
+      `Import ${importedEntries.length} device entr${importedEntries.length === 1 ? "y" : "ies"} to cloud`,
+      beforeSnapshot
+    );
     state.syncFeedback = `Imported ${importedEntries.length} new device entr${importedEntries.length === 1 ? "y" : "ies"} into cloud.`;
   } catch (error) {
     console.error(error);
+    applySessionSnapshot(beforeSnapshot);
+    persistCurrentLocalState();
     state.syncFeedback = "Import could not be completed right now.";
   } finally {
     state.isBusy = false;
@@ -406,6 +426,8 @@ function handleExportData() {
 async function handleImportFileSelection(event) {
   const file = event.target.files?.[0];
   importFileInput.value = "";
+  let beforeSnapshot = null;
+  let importedEntriesForRollback = null;
 
   if (!file || state.isBusy) {
     return;
@@ -415,6 +437,7 @@ async function handleImportFileSelection(event) {
     const raw = await file.text();
     const parsed = JSON.parse(raw);
     const importedEntries = parseImportedEntries(parsed);
+    importedEntriesForRollback = importedEntries;
     if (!importedEntries.length && parsed?.entries && Array.isArray(parsed.entries) && parsed.entries.length) {
       throw new Error("No valid entries were found in this backup.");
     }
@@ -427,21 +450,12 @@ async function handleImportFileSelection(event) {
       return;
     }
 
+    beforeSnapshot = createHistorySnapshot();
     state.isBusy = true;
     render();
 
     if (isCloudMode()) {
-      const currentIds = new Set(state.entries.map((entry) => entry.id));
-      const importedIds = new Set(importedEntries.map((entry) => entry.id));
-      const idsToDelete = [...currentIds].filter((entryId) => !importedIds.has(entryId));
-
-      if (idsToDelete.length) {
-        await deleteUserEntries(state.user.uid, idsToDelete);
-      }
-
-      if (importedEntries.length) {
-        await upsertUserEntries(state.user.uid, importedEntries.map(serializeEntryForCloud));
-      }
+      await syncCloudEntriesToSnapshot(beforeSnapshot.entries, importedEntries);
     } else {
       setLocalEntries(importedEntries, { resetImportedIds: true });
     }
@@ -454,9 +468,21 @@ async function handleImportFileSelection(event) {
     persistSelectedSumIds();
     persistDisplayPreferences();
     resetEditorState();
+    recordHistoryEntry("Import backup", beforeSnapshot);
     state.syncFeedback = `Imported ${importedEntries.length} entr${importedEntries.length === 1 ? "y" : "ies"} from backup into the current table.`;
   } catch (error) {
     console.error(error);
+    if (beforeSnapshot && isCloudMode() && importedEntriesForRollback) {
+      try {
+        await syncCloudEntriesToSnapshot(importedEntriesForRollback, beforeSnapshot.entries);
+      } catch (rollbackError) {
+        console.error(rollbackError);
+      }
+    }
+    if (beforeSnapshot) {
+      applySessionSnapshot(beforeSnapshot);
+      persistCurrentLocalState();
+    }
     state.syncFeedback = "That backup file could not be imported. Please use a valid JSON export from this app.";
   } finally {
     state.isBusy = false;
@@ -474,10 +500,243 @@ function getDefaultFormStatus() {
     : "Guest mode: new entries are saved to this browser automatically.";
 }
 
-function applyEntries(entries) {
-  const normalizedEntries = entries
+function createHistorySnapshot() {
+  return {
+    entries: cloneEntryCollection(state.entries),
+    localEntries: cloneEntryCollection(state.localEntries),
+    selectedSumIds: [...state.selectedSumIds],
+    selectedDeleteIds: [...state.selectedDeleteIds],
+    importedLocalIds: [...state.importedLocalIds],
+    hideZeroValues: state.hideZeroValues,
+    hideEmptyColumns: state.hideEmptyColumns,
+    lastBulkSelectionId: state.lastBulkSelectionId,
+    lastSumSelectionId: state.lastSumSelectionId,
+  };
+}
+
+function cloneEntryCollection(entries) {
+  return entries.map((entry) => ({ ...serializeEntryForCloud(entry) }));
+}
+
+function getSnapshotSignature(snapshot) {
+  return JSON.stringify(snapshot);
+}
+
+function clearSessionHistory() {
+  historyState.undoStack = [];
+  historyState.redoStack = [];
+  renderHistoryConsole();
+}
+
+function recordHistoryEntry(label, beforeSnapshot) {
+  const afterSnapshot = createHistorySnapshot();
+  if (getSnapshotSignature(beforeSnapshot) === getSnapshotSignature(afterSnapshot)) {
+    return;
+  }
+
+  historyState.undoStack.push({
+    label,
+    before: beforeSnapshot,
+    after: afterSnapshot,
+  });
+
+  if (historyState.undoStack.length > HISTORY_LIMIT) {
+    historyState.undoStack.shift();
+  }
+
+  historyState.redoStack = [];
+  renderHistoryConsole();
+}
+
+function normalizeEntryCollection(entries) {
+  return entries
     .map((entry, index) => normalizeStoredEntry(entry, index))
     .sort((firstEntry, secondEntry) => getEntrySortOrder(firstEntry) - getEntrySortOrder(secondEntry));
+}
+
+function applySessionSnapshot(snapshot, options = {}) {
+  const nextEntries = normalizeEntryCollection(snapshot.entries || []);
+  const nextLocalEntries = normalizeEntryCollection(snapshot.localEntries || []);
+  const entryIds = new Set(nextEntries.map((entry) => entry.id));
+  const localIds = new Set(nextLocalEntries.map((entry) => entry.id));
+
+  state.entries = nextEntries;
+  state.localEntries = nextLocalEntries;
+  state.selectedSumIds = new Set((snapshot.selectedSumIds || []).filter((entryId) => entryIds.has(entryId)));
+  state.selectedDeleteIds = new Set((snapshot.selectedDeleteIds || []).filter((entryId) => entryIds.has(entryId)));
+  state.importedLocalIds = new Set((snapshot.importedLocalIds || []).filter((entryId) => localIds.has(entryId)));
+  state.hideZeroValues = Boolean(snapshot.hideZeroValues);
+  state.hideEmptyColumns = Boolean(snapshot.hideEmptyColumns);
+  state.lastBulkSelectionId = entryIds.has(snapshot.lastBulkSelectionId) ? snapshot.lastBulkSelectionId : null;
+  state.lastSumSelectionId = entryIds.has(snapshot.lastSumSelectionId) ? snapshot.lastSumSelectionId : null;
+  clearDragMarkers();
+
+  if (options.resetEditor) {
+    resetEditorState();
+  }
+}
+
+function persistCurrentLocalState() {
+  persistLocalEntries();
+  persistImportedLocalIds();
+  persistSelectedSumIds();
+  persistDisplayPreferences();
+}
+
+function haveEntriesChanged(previousEntries, nextEntries) {
+  return JSON.stringify(cloneEntryCollection(previousEntries)) !== JSON.stringify(cloneEntryCollection(nextEntries));
+}
+
+async function syncCloudEntriesToSnapshot(previousEntries, nextEntries) {
+  if (!isCloudMode()) {
+    return;
+  }
+
+  const previousById = new Map(previousEntries.map((entry) => [entry.id, JSON.stringify(serializeEntryForCloud(entry))]));
+  const nextById = new Map(nextEntries.map((entry) => [entry.id, JSON.stringify(serializeEntryForCloud(entry))]));
+  const idsToDelete = [...previousById.keys()].filter((entryId) => !nextById.has(entryId));
+  const entriesToUpsert = nextEntries.filter(
+    (entry) => previousById.get(entry.id) !== JSON.stringify(serializeEntryForCloud(entry))
+  );
+
+  if (idsToDelete.length) {
+    await deleteUserEntries(state.user.uid, idsToDelete);
+  }
+
+  if (entriesToUpsert.length) {
+    await upsertUserEntries(state.user.uid, entriesToUpsert.map(serializeEntryForCloud));
+  }
+}
+
+async function persistSnapshotTransition(previousSnapshot, nextSnapshot) {
+  persistCurrentLocalState();
+
+  if (isCloudMode() && haveEntriesChanged(previousSnapshot.entries, nextSnapshot.entries)) {
+    await syncCloudEntriesToSnapshot(previousSnapshot.entries, nextSnapshot.entries);
+  }
+}
+
+function renderHistoryConsole() {
+  const nextUndo = historyState.undoStack.at(-1)?.label || "";
+  const nextRedo = historyState.redoStack.at(-1)?.label || "";
+
+  undoButton.disabled = state.isBusy || historyState.undoStack.length === 0;
+  redoButton.disabled = state.isBusy || historyState.redoStack.length === 0;
+  undoButton.title = nextUndo ? `Undo ${nextUndo}` : "Nothing to undo";
+  redoButton.title = nextRedo ? `Redo ${nextRedo}` : "Nothing to redo";
+
+  if (!nextUndo && !nextRedo) {
+    historyStatus.textContent = "Session undo is ready. New saved changes will appear here.";
+    return;
+  }
+
+  if (nextUndo && nextRedo) {
+    historyStatus.textContent = `Next undo: ${nextUndo} • Next redo: ${nextRedo}`;
+    return;
+  }
+
+  historyStatus.textContent = nextUndo ? `Next undo: ${nextUndo}` : `Next redo: ${nextRedo}`;
+}
+
+function isTypingTarget(target) {
+  return Boolean(
+    target &&
+    (target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement ||
+      target instanceof HTMLSelectElement ||
+      target.isContentEditable)
+  );
+}
+
+function handleHistoryShortcut(event) {
+  if (event.defaultPrevented || state.isBusy) {
+    return;
+  }
+
+  if (!(event.metaKey || event.ctrlKey) || event.altKey) {
+    return;
+  }
+
+  if (isTypingTarget(event.target)) {
+    return;
+  }
+
+  const key = event.key.toLowerCase();
+  if (key === "z" && event.shiftKey) {
+    event.preventDefault();
+    redoHistory();
+    return;
+  }
+
+  if (key === "z") {
+    event.preventDefault();
+    undoHistory();
+    return;
+  }
+
+  if (key === "y") {
+    event.preventDefault();
+    redoHistory();
+  }
+}
+
+async function stepHistory(direction) {
+  if (state.isBusy) {
+    return;
+  }
+
+  const sourceStack = direction === "undo" ? historyState.undoStack : historyState.redoStack;
+  const targetStack = direction === "undo" ? historyState.redoStack : historyState.undoStack;
+  const record = sourceStack.at(-1);
+  if (!record) {
+    return;
+  }
+
+  const currentSnapshot = createHistorySnapshot();
+  const targetSnapshot = direction === "undo" ? record.before : record.after;
+  const ledgerView = captureLedgerView();
+
+  state.isBusy = true;
+  applySessionSnapshot(targetSnapshot, { resetEditor: true });
+  render();
+
+  try {
+    await persistSnapshotTransition(currentSnapshot, targetSnapshot);
+    sourceStack.pop();
+    targetStack.push(record);
+    if (targetStack.length > HISTORY_LIMIT) {
+      targetStack.shift();
+    }
+    state.syncFeedback = `${direction === "undo" ? "Undid" : "Redid"} ${record.label.toLowerCase()}.`;
+  } catch (error) {
+    console.error(error);
+    if (isCloudMode() && haveEntriesChanged(currentSnapshot.entries, targetSnapshot.entries)) {
+      try {
+        await syncCloudEntriesToSnapshot(targetSnapshot.entries, currentSnapshot.entries);
+      } catch (rollbackError) {
+        console.error(rollbackError);
+      }
+    }
+    applySessionSnapshot(currentSnapshot);
+    persistCurrentLocalState();
+    state.syncFeedback = `${direction === "undo" ? "Undo" : "Redo"} could not be completed right now.`;
+  } finally {
+    state.isBusy = false;
+    render();
+    restoreLedgerView(ledgerView);
+  }
+}
+
+async function undoHistory() {
+  await stepHistory("undo");
+}
+
+async function redoHistory() {
+  await stepHistory("redo");
+}
+
+function applyEntries(entries) {
+  const normalizedEntries = normalizeEntryCollection(entries);
 
   state.entries = normalizedEntries;
   state.selectedDeleteIds = new Set(
@@ -704,6 +963,7 @@ async function handleSaveEntry(event) {
   }
 
   const entryIdToReveal = state.editingId;
+  const beforeSnapshot = createHistorySnapshot();
 
   if (state.splitSourceId) {
     const splitEntry = readFormEntry(SPLIT_FIELD_PREFIX);
@@ -761,12 +1021,15 @@ async function handleSaveEntry(event) {
 
     persistSelectedSumIds();
     resetEditorState();
+    recordHistoryEntry(entryIdToReveal ? "Update entry" : "Add entry", beforeSnapshot);
 
     if (entryIdToReveal) {
       revealLedgerEntry(entryIdToReveal);
     }
   } catch (error) {
     console.error(error);
+    applySessionSnapshot(beforeSnapshot);
+    persistCurrentLocalState();
     formStatus.textContent = isCloudMode()
       ? "Cloud save failed. Please try again."
       : "This entry could not be saved right now.";
@@ -939,6 +1202,7 @@ async function deleteEntry(entryId) {
     return;
   }
 
+  const beforeSnapshot = createHistorySnapshot();
   state.isBusy = true;
   render();
 
@@ -952,9 +1216,6 @@ async function deleteEntry(entryId) {
     if (state.lastSumSelectionId === entryId) {
       state.lastSumSelectionId = null;
     }
-    if (state.editingId === entryId) {
-      resetEditorState({ preserveMessage: true });
-    }
 
     if (isCloudMode()) {
       await deleteUserEntry(state.user.uid, entryId);
@@ -963,8 +1224,14 @@ async function deleteEntry(entryId) {
     }
 
     persistSelectedSumIds();
+    if (state.editingId === entryId) {
+      resetEditorState({ preserveMessage: true });
+    }
+    recordHistoryEntry("Delete entry", beforeSnapshot);
   } catch (error) {
     console.error(error);
+    applySessionSnapshot(beforeSnapshot);
+    persistCurrentLocalState();
     state.syncFeedback = isCloudMode() ? "That cloud entry could not be deleted right now." : "That entry could not be deleted right now.";
   } finally {
     state.isBusy = false;
@@ -988,6 +1255,7 @@ async function moveEntry(entryId, direction) {
     return;
   }
 
+  const beforeSnapshot = createHistorySnapshot();
   const reordered = [...state.entries];
   const [entry] = reordered.splice(currentIndex, 1);
   reordered.splice(targetIndex, 0, entry);
@@ -1006,8 +1274,11 @@ async function moveEntry(entryId, direction) {
     }
 
     persistSelectedSumIds();
+    recordHistoryEntry("Move entry", beforeSnapshot);
   } catch (error) {
     console.error(error);
+    applySessionSnapshot(beforeSnapshot);
+    persistCurrentLocalState();
     state.syncFeedback = isCloudMode() ? "The cloud order could not be updated right now." : "The row order could not be updated right now.";
   } finally {
     state.isBusy = false;
@@ -1062,6 +1333,7 @@ async function handleDrop(event) {
     return;
   }
 
+  const beforeSnapshot = createHistorySnapshot();
   const reordered = [...state.entries];
   const [draggedEntry] = reordered.splice(fromIndex, 1);
   const insertIndex =
@@ -1085,8 +1357,11 @@ async function handleDrop(event) {
     }
 
     persistSelectedSumIds();
+    recordHistoryEntry("Reorder entries", beforeSnapshot);
   } catch (error) {
     console.error(error);
+    applySessionSnapshot(beforeSnapshot);
+    persistCurrentLocalState();
     state.syncFeedback = isCloudMode() ? "The cloud row order could not be updated right now." : "The row order could not be updated right now.";
   } finally {
     state.isBusy = false;
@@ -1100,6 +1375,7 @@ function handleSumConsoleAction(event) {
     return;
   }
 
+  const beforeSnapshot = createHistorySnapshot();
   const action = button.dataset.sumAction;
   if (action === "select-all") {
     state.selectedSumIds = new Set(state.entries.map((entry) => entry.id));
@@ -1113,6 +1389,7 @@ function handleSumConsoleAction(event) {
 
   persistSelectedSumIds();
   render();
+  recordHistoryEntry(action === "select-all" ? "Select all rows for manual sum" : "Clear manual sum selection", beforeSnapshot);
 }
 
 async function handleBulkConsoleAction(event) {
@@ -1124,16 +1401,20 @@ async function handleBulkConsoleAction(event) {
   const action = button.dataset.bulkAction;
 
   if (action === "select-all") {
+    const beforeSnapshot = createHistorySnapshot();
     state.selectedDeleteIds = new Set(state.entries.map((entry) => entry.id));
     state.lastBulkSelectionId = state.entries.length ? state.entries[state.entries.length - 1].id : null;
     render();
+    recordHistoryEntry("Select all rows for delete", beforeSnapshot);
     return;
   }
 
   if (action === "clear") {
+    const beforeSnapshot = createHistorySnapshot();
     state.selectedDeleteIds = new Set();
     state.lastBulkSelectionId = null;
     render();
+    recordHistoryEntry("Clear bulk delete selection", beforeSnapshot);
     return;
   }
 
@@ -1158,10 +1439,12 @@ function handleLedgerModeAction(event) {
 }
 
 function handleDisplayPreferenceChange() {
+  const beforeSnapshot = createHistorySnapshot();
   state.hideZeroValues = hideZeroValuesToggle.checked;
   state.hideEmptyColumns = hideEmptyColumnsToggle.checked;
   persistDisplayPreferences();
   render();
+  recordHistoryEntry("Update ledger display preferences", beforeSnapshot);
 }
 
 function startSplitEntry(entryId = state.editingId) {
@@ -1220,6 +1503,7 @@ async function deleteSelectedEntries() {
   }
 
   const selectedIds = new Set(selectedEntries.map((entry) => entry.id));
+  const beforeSnapshot = createHistorySnapshot();
   state.isBusy = true;
   render();
 
@@ -1236,10 +1520,6 @@ async function deleteSelectedEntries() {
       state.lastSumSelectionId = null;
     }
 
-    if (state.editingId && selectedIds.has(state.editingId)) {
-      resetEditorState();
-    }
-
     if (isCloudMode()) {
       await deleteUserEntries(state.user.uid, [...selectedIds]);
     } else {
@@ -1247,8 +1527,14 @@ async function deleteSelectedEntries() {
     }
 
     persistSelectedSumIds();
+    if (state.editingId && selectedIds.has(state.editingId)) {
+      resetEditorState();
+    }
+    recordHistoryEntry(`Delete ${selectedEntries.length} entr${selectedEntries.length === 1 ? "y" : "ies"}`, beforeSnapshot);
   } catch (error) {
     console.error(error);
+    applySessionSnapshot(beforeSnapshot);
+    persistCurrentLocalState();
     state.syncFeedback = isCloudMode() ? "Selected cloud entries could not be deleted right now." : "Selected entries could not be deleted right now.";
   } finally {
     state.isBusy = false;
@@ -1265,6 +1551,7 @@ async function deleteAllEntries() {
     return;
   }
 
+  const beforeSnapshot = createHistorySnapshot();
   state.isBusy = true;
   render();
 
@@ -1275,7 +1562,6 @@ async function deleteAllEntries() {
     state.selectedSumIds = new Set();
     state.lastBulkSelectionId = null;
     state.lastSumSelectionId = null;
-    resetEditorState();
 
     if (isCloudMode()) {
       await deleteUserEntries(state.user.uid, entryIds);
@@ -1284,8 +1570,12 @@ async function deleteAllEntries() {
     }
 
     persistSelectedSumIds();
+    resetEditorState();
+    recordHistoryEntry("Delete all entries", beforeSnapshot);
   } catch (error) {
     console.error(error);
+    applySessionSnapshot(beforeSnapshot);
+    persistCurrentLocalState();
     state.syncFeedback = isCloudMode() ? "Cloud entries could not be fully cleared right now." : "Entries could not be fully cleared right now.";
   } finally {
     state.isBusy = false;
@@ -1300,6 +1590,7 @@ async function saveSplitEntries(primaryEntry, secondaryEntry) {
     return;
   }
 
+  const beforeSnapshot = createHistorySnapshot();
   const timestamp = new Date().toISOString();
   const secondEntryId = createId();
   const shouldCarrySum = state.selectedSumIds.has(sourceEntry.id);
@@ -1334,7 +1625,6 @@ async function saveSplitEntries(primaryEntry, secondaryEntry) {
     state.selectedDeleteIds.delete(secondEntryId);
   }
 
-  resetEditorState();
   state.isBusy = true;
   render();
 
@@ -1346,9 +1636,13 @@ async function saveSplitEntries(primaryEntry, secondaryEntry) {
     }
 
     persistSelectedSumIds();
+    resetEditorState();
+    recordHistoryEntry("Split entry", beforeSnapshot);
     revealLedgerEntry(firstEntry.id);
   } catch (error) {
     console.error(error);
+    applySessionSnapshot(beforeSnapshot);
+    persistCurrentLocalState();
     state.syncFeedback = isCloudMode() ? "The cloud split could not be saved right now." : "The split could not be saved right now.";
   } finally {
     state.isBusy = false;
@@ -1374,6 +1668,7 @@ function resetDropMarkers() {
 function render() {
   renderSummary();
   renderSyncConsole();
+  renderHistoryConsole();
   renderEditorMode();
   renderSumConsole();
   renderBulkConsole();
@@ -2065,6 +2360,7 @@ function toggleBulkSelection(entryId, forceState, options = {}) {
     return;
   }
 
+  const beforeSnapshot = createHistorySnapshot();
   const ledgerView = options.preserveLedgerView ? captureLedgerView() : null;
   const shouldSelect =
     typeof forceState === "boolean" ? forceState : !state.selectedDeleteIds.has(entryId);
@@ -2079,6 +2375,7 @@ function toggleBulkSelection(entryId, forceState, options = {}) {
   state.lastBulkSelectionId = entryId;
 
   render();
+  recordHistoryEntry("Update delete selection", beforeSnapshot);
 
   if (ledgerView) {
     restoreLedgerView(ledgerView);
@@ -2090,6 +2387,7 @@ function toggleSumSelection(entryId, options = {}) {
     return;
   }
 
+  const beforeSnapshot = createHistorySnapshot();
   const ledgerView = options.preserveLedgerView ? captureLedgerView() : null;
   const shouldSelect =
     typeof options.forceState === "boolean" ? options.forceState : !state.selectedSumIds.has(entryId);
@@ -2105,6 +2403,7 @@ function toggleSumSelection(entryId, options = {}) {
 
   persistSelectedSumIds();
   render();
+  recordHistoryEntry("Update manual sum selection", beforeSnapshot);
 
   if (ledgerView) {
     restoreLedgerView(ledgerView);
