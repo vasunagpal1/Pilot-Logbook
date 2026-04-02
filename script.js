@@ -120,6 +120,8 @@ const state = {
   selectedSumIds: new Set(loadSelectedSumIds(initialLocalEntries)),
   selectedDeleteIds: new Set(),
   importedLocalIds: new Set(loadImportedLocalIds(initialLocalEntries)),
+  lastBulkSelectionId: null,
+  lastSumSelectionId: null,
   editingId: null,
   splitSourceId: null,
   ledgerInteractionMode: "edit",
@@ -213,6 +215,7 @@ function bindEvents() {
   importFileInput.addEventListener("change", handleImportFileSelection);
 
   entryList.addEventListener("click", handleEntryCardAction);
+  entryList.addEventListener("click", handleEntrySelectionIntent, true);
   entryList.addEventListener("change", handleEntrySelectionChange);
   entryList.addEventListener("dragstart", handleDragStart);
   entryList.addEventListener("dragover", handleDragOver);
@@ -233,7 +236,7 @@ function bindEvents() {
     }
 
     if (state.ledgerInteractionMode === "select") {
-      toggleSumSelection(row.dataset.entryId, { preserveLedgerView: true });
+      toggleSumSelection(row.dataset.entryId, { preserveLedgerView: true, range: event.shiftKey });
       return;
     }
 
@@ -481,6 +484,12 @@ function applyEntries(entries) {
     [...state.selectedDeleteIds].filter((entryId) => normalizedEntries.some((entry) => entry.id === entryId))
   );
   state.selectedSumIds = new Set(loadSelectedSumIds(normalizedEntries));
+  state.lastBulkSelectionId = normalizedEntries.some((entry) => entry.id === state.lastBulkSelectionId)
+    ? state.lastBulkSelectionId
+    : null;
+  state.lastSumSelectionId = normalizedEntries.some((entry) => entry.id === state.lastSumSelectionId)
+    ? state.lastSumSelectionId
+    : null;
 }
 
 function normalizeStoredEntry(entry, fallbackIndex = 0) {
@@ -883,7 +892,7 @@ async function handleEntryCardAction(event) {
   }
 
   if (action === "toggle-sum") {
-    toggleSumSelection(entryId);
+    toggleSumSelection(entryId, { range: event.shiftKey });
     return;
   }
 
@@ -903,7 +912,18 @@ function handleEntrySelectionChange(event) {
     return;
   }
 
-  toggleBulkSelection(checkbox.value, checkbox.checked);
+  const useRange = checkbox.dataset.rangeSelect === "true";
+  delete checkbox.dataset.rangeSelect;
+  toggleBulkSelection(checkbox.value, checkbox.checked, { range: useRange });
+}
+
+function handleEntrySelectionIntent(event) {
+  const checkbox = event.target.closest("[data-bulk-select]");
+  if (!checkbox) {
+    return;
+  }
+
+  checkbox.dataset.rangeSelect = event.shiftKey ? "true" : "false";
 }
 
 async function deleteEntry(entryId) {
@@ -926,6 +946,12 @@ async function deleteEntry(entryId) {
     state.entries = state.entries.filter((item) => item.id !== entryId);
     state.selectedSumIds.delete(entryId);
     state.selectedDeleteIds.delete(entryId);
+    if (state.lastBulkSelectionId === entryId) {
+      state.lastBulkSelectionId = null;
+    }
+    if (state.lastSumSelectionId === entryId) {
+      state.lastSumSelectionId = null;
+    }
     if (state.editingId === entryId) {
       resetEditorState({ preserveMessage: true });
     }
@@ -1077,10 +1103,12 @@ function handleSumConsoleAction(event) {
   const action = button.dataset.sumAction;
   if (action === "select-all") {
     state.selectedSumIds = new Set(state.entries.map((entry) => entry.id));
+    state.lastSumSelectionId = state.entries.length ? state.entries[state.entries.length - 1].id : null;
   }
 
   if (action === "clear") {
     state.selectedSumIds = new Set();
+    state.lastSumSelectionId = null;
   }
 
   persistSelectedSumIds();
@@ -1097,12 +1125,14 @@ async function handleBulkConsoleAction(event) {
 
   if (action === "select-all") {
     state.selectedDeleteIds = new Set(state.entries.map((entry) => entry.id));
+    state.lastBulkSelectionId = state.entries.length ? state.entries[state.entries.length - 1].id : null;
     render();
     return;
   }
 
   if (action === "clear") {
     state.selectedDeleteIds = new Set();
+    state.lastBulkSelectionId = null;
     render();
     return;
   }
@@ -1199,6 +1229,12 @@ async function deleteSelectedEntries() {
     state.selectedSumIds = new Set(
       [...state.selectedSumIds].filter((entryId) => !selectedIds.has(entryId))
     );
+    if (state.lastBulkSelectionId && selectedIds.has(state.lastBulkSelectionId)) {
+      state.lastBulkSelectionId = null;
+    }
+    if (state.lastSumSelectionId && selectedIds.has(state.lastSumSelectionId)) {
+      state.lastSumSelectionId = null;
+    }
 
     if (state.editingId && selectedIds.has(state.editingId)) {
       resetEditorState();
@@ -1237,6 +1273,8 @@ async function deleteAllEntries() {
     state.entries = [];
     state.selectedDeleteIds = new Set();
     state.selectedSumIds = new Set();
+    state.lastBulkSelectionId = null;
+    state.lastSumSelectionId = null;
     resetEditorState();
 
     if (isCloudMode()) {
@@ -1462,11 +1500,11 @@ function renderBulkConsole() {
   if (!totalRows) {
     bulkStatus.textContent = "Save entries to unlock bulk selection and bulk delete.";
   } else if (!selectedRows) {
-    bulkStatus.textContent = "Select one or more entries to delete them together.";
+    bulkStatus.textContent = "Select one or more entries to delete them together. Shift-click checkboxes to grab a range.";
   } else if (selectedRows === totalRows) {
     bulkStatus.textContent = `All ${totalRows} entries are selected for bulk delete.`;
   } else {
-    bulkStatus.textContent = `${selectedRows} of ${totalRows} entries selected for bulk delete.`;
+    bulkStatus.textContent = `${selectedRows} of ${totalRows} entries selected for bulk delete. Shift-click to extend the range faster.`;
   }
 
   deleteSelectedButton.textContent = selectedRows
@@ -1491,11 +1529,11 @@ function renderSumConsole() {
   }
 
   if (!selectedRows) {
-    sumStatus.textContent = "No rows are selected for the manual sum right now.";
+    sumStatus.textContent = "No rows are selected for the manual sum right now. Shift-click rows or sum buttons to grab a range.";
     return;
   }
 
-  sumStatus.textContent = `Manual sum is using ${selectedRows} of ${totalRows} saved rows.`;
+  sumStatus.textContent = `Manual sum is using ${selectedRows} of ${totalRows} saved rows. Shift-click to extend the range faster.`;
 }
 
 function renderEditorMode() {
@@ -1533,7 +1571,7 @@ function renderLedgerMode() {
 
   const isSelectMode = state.ledgerInteractionMode === "select";
   ledgerModeStatus.textContent = isSelectMode
-    ? "Select mode is on. Click filled ledger rows to add or remove them from the manual subtotal."
+    ? "Select mode is on. Click filled ledger rows to add or remove them from the manual subtotal. Shift-click to select a range."
     : "Edit mode is on. Click a filled row to edit it, or switch to Select rows to choose entries for the manual subtotal.";
 
   ledgerModeToggle.querySelectorAll("[data-ledger-mode]").forEach((button) => {
@@ -2030,12 +2068,15 @@ function toggleBulkSelection(entryId, forceState, options = {}) {
   const ledgerView = options.preserveLedgerView ? captureLedgerView() : null;
   const shouldSelect =
     typeof forceState === "boolean" ? forceState : !state.selectedDeleteIds.has(entryId);
-
-  if (shouldSelect) {
-    state.selectedDeleteIds.add(entryId);
-  } else {
-    state.selectedDeleteIds.delete(entryId);
-  }
+  const targetIds = options.range ? getEntryRangeIds(state.lastBulkSelectionId, entryId) : [entryId];
+  targetIds.forEach((targetId) => {
+    if (shouldSelect) {
+      state.selectedDeleteIds.add(targetId);
+    } else {
+      state.selectedDeleteIds.delete(targetId);
+    }
+  });
+  state.lastBulkSelectionId = entryId;
 
   render();
 
@@ -2050,12 +2091,17 @@ function toggleSumSelection(entryId, options = {}) {
   }
 
   const ledgerView = options.preserveLedgerView ? captureLedgerView() : null;
-
-  if (state.selectedSumIds.has(entryId)) {
-    state.selectedSumIds.delete(entryId);
-  } else {
-    state.selectedSumIds.add(entryId);
-  }
+  const shouldSelect =
+    typeof options.forceState === "boolean" ? options.forceState : !state.selectedSumIds.has(entryId);
+  const targetIds = options.range ? getEntryRangeIds(state.lastSumSelectionId, entryId) : [entryId];
+  targetIds.forEach((targetId) => {
+    if (shouldSelect) {
+      state.selectedSumIds.add(targetId);
+    } else {
+      state.selectedSumIds.delete(targetId);
+    }
+  });
+  state.lastSumSelectionId = entryId;
 
   persistSelectedSumIds();
   render();
@@ -2063,6 +2109,19 @@ function toggleSumSelection(entryId, options = {}) {
   if (ledgerView) {
     restoreLedgerView(ledgerView);
   }
+}
+
+function getEntryRangeIds(anchorId, targetId) {
+  const targetIndex = state.entries.findIndex((entry) => entry.id === targetId);
+  const anchorIndex = state.entries.findIndex((entry) => entry.id === anchorId);
+
+  if (targetIndex < 0 || anchorIndex < 0) {
+    return [targetId];
+  }
+
+  const start = Math.min(anchorIndex, targetIndex);
+  const end = Math.max(anchorIndex, targetIndex);
+  return state.entries.slice(start, end + 1).map((entry) => entry.id);
 }
 
 function scrollEditorIntoView() {
