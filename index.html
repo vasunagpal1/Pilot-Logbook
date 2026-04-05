@@ -23,36 +23,70 @@
         <p class="maker-signature">Made by Uran Khatola</p>
 
         <section class="sync-console" aria-label="Sync and account controls">
-          <div>
-            <p class="sync-console__eyebrow">Sync &amp; Access</p>
-            <p id="auth-status" class="sync-console__status">Guest mode: entries stay on this device only.</p>
-            <p id="sync-message" class="sync-console__hint">
-              Sign in with Google to sync your logbook across devices. You can import this device's entries into cloud at any time.
+          <article class="sync-panel sync-panel--access">
+            <div class="sync-panel__header">
+              <p class="sync-console__eyebrow">Sync &amp; Access</p>
+              <span id="sync-badge" class="sync-badge">guest mode</span>
+            </div>
+            <div class="sync-account">
+              <div id="sync-avatar" class="sync-avatar" aria-hidden="true">GU</div>
+              <div class="sync-account__copy">
+                <p id="auth-status" class="sync-account__name">Guest mode</p>
+                <p id="sync-message" class="sync-account__meta">Using this browser only.</p>
+              </div>
+              <div class="sync-account__actions">
+                <button type="button" class="button button-primary" id="sign-in-button">Sign in with Google</button>
+                <button type="button" class="button button-ghost" id="sign-out-button" hidden>Sign out</button>
+              </div>
+            </div>
+            <div class="sync-stats">
+              <article id="sync-cloud-stat" class="sync-stat">
+                <p id="sync-cloud-count" class="sync-stat__value">0</p>
+                <p class="sync-stat__label">Cloud entries</p>
+              </article>
+              <article id="sync-pending-stat" class="sync-stat sync-stat--accent">
+                <p id="sync-pending-count" class="sync-stat__value">0</p>
+                <p class="sync-stat__label">Pending sync</p>
+              </article>
+            </div>
+            <p id="sync-summary" class="sync-console__summary sync-console__summary--note">
+              Start logging on this device. Sign in when you want cloud sync.
             </p>
-            <p id="sync-summary" class="sync-console__summary">
-              0 device entries • Sign in to start cloud sync
-            </p>
-          </div>
-          <div class="sync-console__actions">
-            <button type="button" class="button button-primary" id="sign-in-button">Sign in with Google</button>
-            <button type="button" class="button button-ghost" id="sign-out-button" hidden>Sign out</button>
-            <button type="button" class="button button-ghost" id="import-local-button">
-              Import device data to cloud
-            </button>
-            <button type="button" class="button button-ghost" id="export-data-button">Download backup</button>
-            <button type="button" class="button button-ghost" id="import-file-button">Upload backup</button>
-            <input id="import-file-input" type="file" accept="application/json,.json" hidden />
-          </div>
-          <div class="history-console" aria-label="Undo and redo controls">
-            <div class="history-console__actions">
-              <button type="button" class="button button-ghost" id="undo-button">Undo</button>
-              <button type="button" class="button button-ghost" id="redo-button">Redo</button>
+          </article>
+
+          <article class="sync-panel sync-panel--actions">
+            <div class="sync-panel__header">
+              <p class="sync-console__eyebrow">Actions</p>
+            </div>
+            <div class="sync-action-list">
+              <button type="button" class="button button-ghost sync-action-button" id="import-local-button" data-icon="↑">
+                Import device data to cloud
+              </button>
+              <button type="button" class="button button-ghost sync-action-button" id="export-data-button" data-icon="↓">
+                Download backup
+              </button>
+              <button type="button" class="button button-ghost sync-action-button" id="import-file-button" data-icon="↑">
+                Upload backup
+              </button>
+              <input id="import-file-input" type="file" accept="application/json,.json" hidden />
+            </div>
+          </article>
+
+          <article class="sync-panel sync-panel--session">
+            <div class="sync-panel__header">
+              <p class="sync-console__eyebrow">Session</p>
+            </div>
+            <div class="history-console" aria-label="Undo and redo controls">
+              <div class="history-console__actions">
+                <button type="button" class="button button-ghost history-button" id="undo-button">&larr; Undo</button>
+                <button type="button" class="button button-ghost history-button" id="redo-button">Redo &rarr;</button>
+              </div>
             </div>
             <p id="history-status" class="history-console__status">
               Session undo is ready. New saved changes will appear here.
             </p>
-          </div>
-          <p id="sync-feedback" class="sync-console__feedback" aria-live="polite"></p>
+            <p id="sync-feedback" class="sync-console__feedback" aria-live="polite"></p>
+          </article>
         </section>
       </div>
 

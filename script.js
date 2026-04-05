@@ -192,8 +192,14 @@ const importFileInput = document.querySelector("#import-file-input");
 const undoButton = document.querySelector("#undo-button");
 const redoButton = document.querySelector("#redo-button");
 const historyStatus = document.querySelector("#history-status");
+const syncBadge = document.querySelector("#sync-badge");
+const syncAvatar = document.querySelector("#sync-avatar");
 const authStatus = document.querySelector("#auth-status");
 const syncMessage = document.querySelector("#sync-message");
+const syncCloudStat = document.querySelector("#sync-cloud-stat");
+const syncPendingStat = document.querySelector("#sync-pending-stat");
+const syncCloudCount = document.querySelector("#sync-cloud-count");
+const syncPendingCount = document.querySelector("#sync-pending-count");
 const syncSummary = document.querySelector("#sync-summary");
 const syncFeedback = document.querySelector("#sync-feedback");
 const ledgerColgroupMarkup = ledgerTable.querySelector("colgroup").outerHTML;
@@ -1717,14 +1723,45 @@ function renderSummary() {
   summaryMeDual.textContent = formatTotal(totals.meDual);
 }
 
+function createSyncInitials(source, fallback = "GU") {
+  const cleanedSource = String(source || "").trim();
+  if (!cleanedSource) {
+    return fallback;
+  }
+
+  const normalizedSource = cleanedSource.includes("@") ? cleanedSource.split("@")[0] : cleanedSource;
+  const words = normalizedSource
+    .replace(/[^a-z0-9]+/gi, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (!words.length) {
+    return fallback;
+  }
+
+  return words
+    .slice(0, 2)
+    .map((word) => word[0])
+    .join("")
+    .toUpperCase();
+}
+
 function renderSyncConsole() {
   const hasDeviceEntries = state.localEntries.length > 0;
   const isSignedIn = Boolean(state.user);
   const pendingLocalImports = getPendingLocalImports();
   const deviceEntryCount = state.localEntries.length;
   const cloudEntryCount = isCloudMode() ? state.entries.length : 0;
+  const pendingEntryCount = isCloudMode() ? pendingLocalImports.length : deviceEntryCount;
+  const displayName = state.user?.displayName || state.user?.email?.split("@")[0] || "Google user";
   let importLocalButtonLabel = "Import device data to cloud";
-  let syncSummaryText = "";
+  let badgeText = "guest mode";
+  let badgeClassName = "sync-badge sync-badge--guest";
+  let accountName = "Guest mode";
+  let accountMeta = hasDeviceEntries ? "Saved on this browser only" : "Ready for first entry";
+  let syncSummaryText = "Start logging on this device. Sign in when you want cloud sync.";
+  let summaryClassName = "sync-console__summary sync-console__summary--note";
 
   if (!hasDeviceEntries) {
     importLocalButtonLabel = "No device entries to import";
@@ -1738,12 +1775,33 @@ function renderSyncConsole() {
     importLocalButtonLabel = `Import ${pendingLocalImports.length} device entr${pendingLocalImports.length === 1 ? "y" : "ies"} to cloud`;
   }
 
-  if (isCloudMode()) {
-    syncSummaryText = `${cloudEntryCount} cloud entr${cloudEntryCount === 1 ? "y" : "ies"} • ${pendingLocalImports.length} pending from this device`;
+  if (!state.authResolved) {
+    badgeText = "checking";
+    badgeClassName = "sync-badge sync-badge--checking";
+    accountName = "Checking account";
+    accountMeta = "Resolving sign-in and sync status";
+    syncSummaryText = "Checking whether this logbook should stay in guest mode or connect to cloud sync.";
+  } else if (isCloudMode()) {
+    badgeText = "cloud active";
+    badgeClassName = "sync-badge";
+    accountName = displayName;
+    accountMeta = "Signed in • syncing";
+    syncSummaryText = pendingLocalImports.length
+      ? `${pendingLocalImports.length} guest entr${pendingLocalImports.length === 1 ? "y" : "ies"} on this device ${
+          pendingLocalImports.length === 1 ? "is" : "are"
+        } not yet synced to cloud. Import to keep your logbook complete.`
+      : "This device copy is already fully represented in cloud.";
+    if (!pendingLocalImports.length) {
+      summaryClassName += " sync-console__summary--calm";
+    }
   } else if (isSignedIn) {
-    syncSummaryText = `${deviceEntryCount} device entr${deviceEntryCount === 1 ? "y" : "ies"} • cloud temporarily unavailable`;
-  } else {
-    syncSummaryText = `${deviceEntryCount} device entr${deviceEntryCount === 1 ? "y" : "ies"} • sign in to start cloud sync`;
+    badgeText = "device mode";
+    badgeClassName = "sync-badge sync-badge--fallback";
+    accountName = displayName;
+    accountMeta = "Signed in • using device copy";
+    syncSummaryText = "Your Google account is connected, but cloud data is temporarily unavailable. You can keep working on the device copy.";
+  } else if (hasDeviceEntries) {
+    syncSummaryText = `${deviceEntryCount} guest entr${deviceEntryCount === 1 ? "y is" : "ies are"} saved on this device only. Sign in when you want cloud sync.`;
   }
 
   storageModeValue.textContent = isCloudMode()
@@ -1751,25 +1809,25 @@ function renderSyncConsole() {
     : isSignedIn
       ? "Signed in · using device copy"
       : "Local browser vault";
-  authStatus.textContent = !state.authResolved
-    ? "Checking sign-in status..."
-    : isSignedIn
-      ? `Signed in as ${state.user.displayName || state.user.email || "Google user"}.`
-      : "Guest mode: entries stay on this device only.";
-  syncMessage.textContent = isCloudMode()
-    ? pendingLocalImports.length
-      ? `Cloud sync is active. This device has ${pendingLocalImports.length} guest entr${pendingLocalImports.length === 1 ? "y" : "ies"} not yet in cloud.`
-      : "Cloud sync is active. This device copy is already represented in cloud."
-    : isSignedIn
-      ? "Your Google account is connected, but cloud data is not available right now. You can still use the device copy and try again later."
-      : "Sign in with Google to sync your logbook across devices. You can keep testing in guest mode first.";
+  syncBadge.className = badgeClassName;
+  syncBadge.textContent = badgeText;
+  syncAvatar.textContent = createSyncInitials(isSignedIn ? displayName || state.user?.email : "Guest user");
+  syncAvatar.classList.toggle("sync-avatar--guest", !isSignedIn);
+  authStatus.textContent = accountName;
+  syncMessage.textContent = accountMeta;
+  syncCloudCount.textContent = String(cloudEntryCount);
+  syncPendingCount.textContent = String(pendingEntryCount);
+  syncCloudStat.classList.toggle("is-empty", cloudEntryCount === 0);
+  syncPendingStat.classList.toggle("is-empty", pendingEntryCount === 0);
+  syncSummary.className = summaryClassName;
   syncSummary.textContent = syncSummaryText;
+  syncFeedback.hidden = !state.syncFeedback;
   syncFeedback.textContent = state.syncFeedback;
 
   signInButton.hidden = isSignedIn;
   signOutButton.hidden = !isSignedIn;
-  signInButton.disabled = state.isBusy;
-  signOutButton.disabled = state.isBusy;
+  signInButton.disabled = state.isBusy || !state.authResolved;
+  signOutButton.disabled = state.isBusy || !state.authResolved;
   exportDataButton.disabled = state.isBusy || state.entries.length === 0;
   importFileButton.disabled = state.isBusy;
   importLocalButton.disabled = state.isBusy || !isCloudMode() || !hasDeviceEntries || pendingLocalImports.length === 0;
