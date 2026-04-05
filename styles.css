@@ -77,7 +77,7 @@ body::before {
 .hero-shell {
   padding: 12px 0 10px;
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(420px, 0.9fr);
+  grid-template-columns: minmax(0, 1.18fr) minmax(420px, 0.82fr);
   gap: 14px;
 }
 
@@ -92,18 +92,20 @@ body::before {
 
 .hero-copy {
   border-radius: var(--radius-lg);
-  padding: 18px 22px;
+  padding: 18px 24px 20px;
 }
 
 .sync-console {
-  margin-top: 16px;
+  margin-top: 20px;
   display: grid;
-  gap: 14px;
+  grid-template-columns: minmax(0, 1.18fr) minmax(320px, 0.82fr);
+  gap: 12px;
+  align-items: start;
 }
 
 .sync-panel {
   overflow: hidden;
-  border-radius: 26px;
+  border-radius: 24px;
   background:
     linear-gradient(180deg, rgba(11, 19, 29, 0.94), rgba(9, 18, 27, 0.9)),
     rgba(7, 16, 24, 0.88);
@@ -111,12 +113,25 @@ body::before {
   box-shadow: var(--shadow-md);
 }
 
+.sync-panel--access {
+  grid-row: 1 / span 2;
+}
+
+.sync-panel--actions,
+.sync-panel--session {
+  grid-column: 2;
+}
+
+.sync-panel--session {
+  align-self: end;
+}
+
 .sync-panel__header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  padding: 18px 22px 16px;
+  padding: 14px 18px 13px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
@@ -125,7 +140,7 @@ body::before {
   color: rgba(240, 186, 110, 0.5);
   text-transform: uppercase;
   letter-spacing: 0.24em;
-  font-size: 0.68rem;
+  font-size: 0.64rem;
 }
 
 .sync-console__summary,
@@ -136,11 +151,11 @@ body::before {
 .sync-badge {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 18px;
+  gap: 8px;
+  padding: 7px 15px;
   border-radius: 999px;
   font-family: "JetBrains Mono", monospace;
-  font-size: 0.7rem;
+  font-size: 0.66rem;
   text-transform: lowercase;
   letter-spacing: 0.08em;
   border: 1px solid rgba(88, 232, 150, 0.12);
@@ -150,8 +165,8 @@ body::before {
 
 .sync-badge::before {
   content: "";
-  width: 11px;
-  height: 11px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   background: currentColor;
   box-shadow: 0 0 18px color-mix(in srgb, currentColor 55%, transparent);
@@ -178,14 +193,14 @@ body::before {
 .sync-account {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 18px;
+  gap: 14px;
   align-items: center;
-  padding: 20px 22px;
+  padding: 16px 18px;
 }
 
 .sync-avatar {
-  width: 78px;
-  height: 78px;
+  width: 66px;
+  height: 66px;
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -193,7 +208,7 @@ body::before {
   background: linear-gradient(135deg, #e1bf77, #c6a05e);
   color: #10151d;
   font-family: "Fraunces", serif;
-  font-size: 1.7rem;
+  font-size: 1.45rem;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
 }
 
@@ -208,7 +223,7 @@ body::before {
 
 .sync-account__name {
   margin: 0;
-  font-size: clamp(1.15rem, 1.9vw, 1.65rem);
+  font-size: clamp(1.05rem, 1.55vw, 1.45rem);
   line-height: 1.05;
   color: rgba(255, 255, 255, 0.96);
 }
@@ -217,7 +232,7 @@ body::before {
   margin: 4px 0 0;
   font-family: "JetBrains Mono", monospace;
   color: rgba(240, 186, 110, 0.42);
-  font-size: 0.82rem;
+  font-size: 0.76rem;
   letter-spacing: 0.02em;
 }
 
@@ -229,19 +244,20 @@ body::before {
 }
 
 .sync-account__actions .button {
-  min-height: 52px;
+  min-height: 46px;
+  padding-inline: 12px;
 }
 
 .sync-stats {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  padding: 8px 22px 20px;
+  gap: 12px;
+  padding: 4px 18px 16px;
 }
 
 .sync-stat {
-  padding: 20px 26px 18px;
-  border-radius: 22px;
+  padding: 14px 18px 13px;
+  border-radius: 20px;
   background: rgba(255, 255, 255, 0.045);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
@@ -249,7 +265,7 @@ body::before {
 .sync-stat__value {
   margin: 0 0 6px;
   font-family: "Fraunces", serif;
-  font-size: clamp(2.2rem, 4vw, 3.05rem);
+  font-size: clamp(1.85rem, 2.7vw, 2.65rem);
   line-height: 0.95;
   color: rgba(255, 255, 255, 0.96);
 }
@@ -259,7 +275,7 @@ body::before {
   color: rgba(240, 186, 110, 0.4);
   text-transform: uppercase;
   letter-spacing: 0.2em;
-  font-size: 0.8rem;
+  font-size: 0.72rem;
 }
 
 .sync-stat--accent .sync-stat__value {
@@ -272,9 +288,9 @@ body::before {
 
 .sync-console__summary {
   position: relative;
-  padding: 22px 22px 22px 54px;
+  padding: 16px 18px 16px 44px;
   color: rgba(255, 255, 255, 0.74);
-  font-size: 0.92rem;
+  font-size: 0.84rem;
   line-height: 1.42;
   background: rgba(240, 186, 110, 0.11);
   border-top: 1px solid rgba(240, 186, 110, 0.15);
@@ -283,10 +299,10 @@ body::before {
 .sync-console__summary::before {
   content: "";
   position: absolute;
-  left: 22px;
-  top: 28px;
-  width: 10px;
-  height: 10px;
+  left: 18px;
+  top: 22px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
   background: #e1bf77;
 }
@@ -303,23 +319,23 @@ body::before {
 .sync-action-list,
 .history-console__actions {
   display: grid;
-  gap: 14px;
+  gap: 10px;
 }
 
 .sync-action-list {
-  padding: 20px 22px 22px;
+  padding: 14px 18px 18px;
 }
 
 .sync-action-button,
 .history-button {
-  min-height: 86px;
-  border-radius: 20px;
-  padding: 18px 22px;
+  min-height: 64px;
+  border-radius: 18px;
+  padding: 14px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18px;
-  font-size: 1.05rem;
+  gap: 14px;
+  font-size: 0.92rem;
   font-weight: 600;
   text-align: left;
   background: rgba(255, 255, 255, 0.025);
@@ -328,9 +344,9 @@ body::before {
 
 .sync-action-button::before {
   content: attr(data-icon);
-  width: 42px;
-  height: 42px;
-  border-radius: 14px;
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
   display: grid;
   place-items: center;
   flex-shrink: 0;
@@ -338,14 +354,14 @@ body::before {
   background: rgba(6, 13, 20, 0.72);
   border: 1px solid rgba(255, 255, 255, 0.06);
   font-family: "JetBrains Mono", monospace;
-  font-size: 1.15rem;
+  font-size: 1rem;
 }
 
 .sync-action-button::after {
   content: "→";
   color: rgba(240, 186, 110, 0.4);
   font-family: "JetBrains Mono", monospace;
-  font-size: 1.1rem;
+  font-size: 1rem;
   margin-left: auto;
 }
 
@@ -355,7 +371,7 @@ body::before {
 }
 
 .history-console {
-  padding: 20px 22px 0;
+  padding: 14px 18px 0;
   border-top: 0;
 }
 
@@ -365,9 +381,9 @@ body::before {
 
 .history-console__status {
   margin: 0;
-  padding: 16px 22px 0;
+  padding: 12px 18px 0;
   color: rgba(255, 255, 255, 0.72);
-  font-size: 0.92rem;
+  font-size: 0.8rem;
   line-height: 1.4;
   text-align: left;
 }
@@ -375,14 +391,14 @@ body::before {
 .history-button {
   justify-content: center;
   font-family: "JetBrains Mono", monospace;
-  font-size: 0.94rem;
+  font-size: 0.82rem;
   letter-spacing: 0.04em;
 }
 
 .sync-console__feedback {
-  padding: 12px 22px 22px;
+  padding: 10px 18px 16px;
   color: rgba(159, 213, 206, 0.86);
-  font-size: 0.82rem;
+  font-size: 0.76rem;
   line-height: 1.35;
 }
 
@@ -407,26 +423,67 @@ body::before {
 }
 
 .hero-copy h1 {
-  max-width: 16ch;
-  font-size: clamp(1.95rem, 2.9vw, 3.35rem);
-  line-height: 0.94;
+  max-width: 12ch;
+  font-size: clamp(2.45rem, 4vw, 4.6rem);
+  line-height: 0.9;
+}
+
+.hero-title {
+  display: grid;
+  gap: 0.02em;
+  margin-top: 10px;
+}
+
+.hero-title > span {
+  display: block;
+}
+
+.hero-title__accent {
+  color: #d7b372;
+  font-style: italic;
+  font-weight: 600;
 }
 
 .hero-text {
-  max-width: 52ch;
-  margin: 10px 0 0;
-  color: var(--white-soft);
-  font-size: 0.96rem;
-  line-height: 1.35;
+  max-width: 20ch;
+  margin: 16px 0 0;
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 0.92rem;
+  line-height: 1.45;
 }
 
 .maker-signature,
 .paper-credit {
-  margin: 8px 0 0;
+  margin: 0;
   color: rgba(255, 255, 255, 0.66);
-  font-size: 0.76rem;
+  font-size: 0.92rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: 0.9rem;
+  letter-spacing: 0.28em;
+}
+
+.maker-signature {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+  color: rgba(255, 255, 255, 0.5);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+}
+
+.maker-signature__lead {
+  color: rgba(255, 255, 255, 0.36);
+}
+
+.maker-signature__name {
+  color: rgba(240, 186, 110, 0.68);
 }
 
 .hero-metrics {
@@ -437,10 +494,10 @@ body::before {
 
 .hero-cards {
   border-radius: var(--radius-lg);
-  padding: 14px;
+  padding: 12px;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  gap: 10px;
   align-content: start;
 }
 
@@ -1436,6 +1493,17 @@ body::before {
 
   .hero-copy h1 {
     max-width: none;
+  }
+
+  .sync-console {
+    grid-template-columns: 1fr;
+  }
+
+  .sync-panel--access,
+  .sync-panel--actions,
+  .sync-panel--session {
+    grid-column: auto;
+    grid-row: auto;
   }
 
   .hero-cards,
