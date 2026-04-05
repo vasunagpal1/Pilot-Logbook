@@ -559,7 +559,7 @@ body::before {
 
 .entry-zone {
   display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.85fr);
+  grid-template-columns: minmax(0, 1.42fr) minmax(360px, 0.98fr);
   gap: 14px;
   align-items: stretch;
 }
@@ -583,6 +583,10 @@ body::before {
   min-height: 0;
 }
 
+.panel-manifest {
+  align-self: stretch;
+}
+
 .panel-scroll {
   min-height: 0;
   padding-right: 4px;
@@ -592,6 +596,8 @@ body::before {
 .panel-scroll--manifest {
   display: grid;
   align-content: start;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  min-height: 0;
 }
 
 .panel-heading,
@@ -1423,6 +1429,7 @@ body::before {
 @media (min-width: 1181px) {
   .panel-form,
   .panel-manifest {
+    height: calc(100vh - 168px);
     max-height: calc(100vh - 168px);
   }
 
@@ -1450,7 +1457,7 @@ body::before {
   }
 
   .entry-zone {
-    grid-template-columns: minmax(0, 1.3fr) minmax(300px, 0.9fr);
+    grid-template-columns: minmax(0, 1.2fr) minmax(340px, 1fr);
   }
 }
 
