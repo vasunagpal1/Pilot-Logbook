@@ -1,587 +1,340 @@
 # Pilot Logbook Atelier
 
-A polished browser-based pilot logbook styled after a traditional 32-column paper training logbook, with a fast entry workflow, printable ledger sheets, guest-mode storage, and Firebase-backed cloud sync.
+Pilot Logbook Atelier is a digital pilot logbook designed to feel like a clean, modern version of a paper training logbook.
+
+Live website:
+[https://pilot-logbook-by-uran.web.app](https://pilot-logbook-by-uran.web.app)
 
 Made by Uran Khatola.
 
-Live site:
-[https://pilot-logbook-by-uran.web.app](https://pilot-logbook-by-uran.web.app)
-
-Repository:
-[https://github.com/vasunagpal1/Pilot-Logbook](https://github.com/vasunagpal1/Pilot-Logbook)
-
-## What This Project Does
-
-Pilot Logbook Atelier lets a user:
-
-- enter pilot logbook rows in a structured digital form
-- view entries on a ledger styled like a real paper logbook
-- edit, delete, split, and reorder entries
-- keep entries locally on the same device without logging in
-- sign in with Google and sync entries privately to Firebase
-- import device data into cloud at any time
-- download a JSON backup of current table data
-- upload a JSON backup to restore the table
-- calculate automatic totals and manual subtotals
-- hide zero values and hide fully empty columns
-- print the ledger in a landscape-friendly format
-
-## Core Experience
-
-The app is designed around two usage modes.
-
-### 1. Guest Mode
-
-Guest mode works immediately with no login.
-
-In this mode:
-
-- all entries are stored in the browser on that device
-- the app continues to work after refresh or reopening the page
-- the data stays tied to that browser profile unless you export it
-- this is ideal for quick testing or first-time use
-
-### 2. Cloud Mode
-
-Cloud mode starts after Google sign-in.
-
-In this mode:
-
-- the user’s entries are stored in Cloud Firestore
-- the same logbook can be accessed from multiple devices
-- each user can read and write only their own entries
-- guest/device data remains available separately on the device
-- guest/device data can be imported into cloud whenever needed
-
-This dual-mode setup keeps the app easy to try while still allowing proper cross-device sync later.
-
-## Feature Overview
-
-### Entry Management
-
-- Add a new flight entry
-- Edit an existing entry from the card list or the ledger row
-- Delete a single entry
-- Delete selected entries in bulk
-- Delete all entries
-- Split one entry into two consecutive entries in the same original position
-- Reorder entries by drag-and-drop
-- Reorder entries using move buttons
-
-### Ledger Features
-
-- 32-column paper-style logbook layout
-- grouped headers matching a training logbook structure
-- sticky top header while scrolling through the ledger
-- horizontal scrolling for the sheet view
-- print-specific landscape ledger pages
-- automatic footer totals for numeric columns
-- manual subtotal based on selected rows
-
-### Table Visibility Controls
-
-- Hide `0` / `0.0` values
-- Hide columns with no meaningful value in any saved row
-
-These help the user scan the ledger quickly without visual clutter.
-
-### Selection and Summation
-
-- default totals include all rows
-- manual subtotal can be built from selected rows
-- row selection can be made from the ledger itself
-- selection state is saved and restored
-
-### Backup and Restore
-
-- Download the current table as a JSON backup
-- Upload a backup file to replace the current active table
-- imported backups restore:
-  - entries
-  - sum selection
-  - display preferences
-
-### Firebase and User Sync
-
-- Google sign-in
-- private Firestore storage per user
-- user profile record saved at `users/{uid}`
-- entries saved under `users/{uid}/entries/{entryId}`
-- secure Firestore rules
-
-## Tech Stack
-
-- HTML
-- CSS
-- vanilla JavaScript
-- Firebase Hosting
-- Firebase Authentication
-- Cloud Firestore
-
-There is no custom backend server for this project.
-
-## Project Structure
-
-- `index.html`
-  Main application markup and UI structure
-
-- `styles.css`
-  Full visual design, responsive behavior, print styling, and ledger layout
-
-- `script.js`
-  Main application logic for form handling, ledger rendering, entry actions, totals, guest/cloud mode, import/export, and UI state
-
-- `firebase-client.js`
-  Firebase integration layer for Auth and Firestore operations
-
-- `firebase.json`
-  Firebase Hosting and Firestore configuration
-
-- `.firebaserc`
-  Firebase project linkage for local CLI usage
-
-- `firestore.rules`
-  Firestore security rules
-
-- `firestore.indexes.json`
-  Firestore index configuration
-
-- `404.html`
-  Firebase Hosting fallback page
-
-- `.gitignore`
-  Ignores local generated artifacts such as `.firebase/` and test outputs
-
-## Data Model
-
-### Firestore
-
-User profile:
-
-- `users/{uid}`
-
-Contains:
-
-- `uid`
-- `displayName`
-- `email`
-- `photoURL`
-- `providerId`
-- `lastSeenAt`
-
-User entries:
-
-- `users/{uid}/entries/{entryId}`
-
-Each entry stores:
-
-- all logbook form fields
-- `id`
-- `createdAt`
-- `updatedAt`
-- `sortOrder`
-
-### Local Browser Storage
-
-In guest mode, the app stores local state in `localStorage`.
-
-This includes:
-
-- entries
-- manual subtotal row selection
-- display preferences
-
-## How the App Behaves in Different Environments
-
-### On the Firebase-hosted website
-
-The app supports:
-
-- guest mode
-- Google sign-in
-- Firestore cloud sync
-- local-device import into cloud
-- backup export/import
-
-### On a plain local static server
-
-The app supports:
-
-- guest mode
-- backup export/import
-- full entry workflow
-
-Google sign-in and cloud sync are intended to work from the Firebase-hosted site because Firebase config is loaded there from Hosting runtime config.
-
-## How To Run the Project Locally
-
-### Option 1: Quick local static server
-
-From the project folder:
-
-```bash
-python3 -m http.server 4326
-```
-
-Then open:
-
-```text
-http://127.0.0.1:4326
-```
-
-This is good for:
-
-- UI work
-- guest mode testing
-- print testing
-- backup import/export testing
-
-### Option 2: Firebase Hosting local workflow
-
-If you want the environment closer to the hosted site:
-
-```bash
-firebase serve
-```
-
-or
-
-```bash
-firebase emulators:start
-```
-
-depending on what you want to test.
-
-This is more useful when checking Firebase-connected behavior.
-
-## How To Use the App
-
-## 1. Start in Guest Mode
-
-Open the site and begin using the form.
+## What You Can Do On The Website
+
+- add flight entries
+- edit existing entries
+- split one entry into two entries
+- delete one entry or many entries together
+- reorder entries
+- view everything in a paper-style ledger
+- calculate totals automatically
+- create your own manual subtotal from selected rows
+- hide zero values to make the sheet easier to scan
+- hide empty columns that do not contain any real values
+- print the logbook in a landscape sheet format
+- save your entries on the same device without signing in
+- sign in with Google and keep your logbook in the cloud
+- import device-only entries into your cloud logbook
+- download a backup file
+- upload a backup file and restore your data
+- use undo and redo for saved changes in the current session
+
+## Before You Start
+
+You can use the website in two ways.
+
+### 1. Guest mode
+
+This starts automatically when you open the website.
 
 In guest mode:
 
-- no login is required
-- entries are saved on that browser/device
-- the top sync panel explains the current storage mode
+- your entries are saved on that browser and device
+- you can close the site and come back later on the same device
+- your entries will still be there unless you clear browser data
 
-## 2. Add a Flight Entry
+### 2. Cloud mode
 
-Fill in:
+This starts when you sign in with Google.
 
-- core details
-- instrument and instruction fields
-- aircraft time fields
-- landings and remarks
+In cloud mode:
 
-Then click:
+- new changes save to your cloud logbook automatically
+- you can open the website on another device and still see your entries
+- your cloud logbook is private to your Google account
 
-```text
-Save entry
-```
+Important:
 
-The row appears in:
+- once you are signed in and cloud mode is active, normal saving is automatic
+- you do not need to press any separate sync button every time
+- the import button is only for bringing older guest-mode entries from this device into the cloud
 
-- the saved entry stack
-- the ledger below
+## The Main Parts Of The Website
 
-## 3. Edit an Entry
+## 1. Sync & Access
 
-You can edit an entry by:
+This section shows:
 
-- clicking `Edit` on the saved entry card
-- clicking the corresponding ledger row in edit mode
+- whether you are in guest mode or cloud mode
+- how many entries are in the cloud
+- how many entries on this device are still not in cloud
+- buttons for sign in, sign out, backup, import, undo, and redo
 
-Then click:
+If you are signed in, this area is the fastest way to understand whether your device data is already included in your cloud logbook.
 
-```text
-Update entry
-```
+## 2. Entry Form
 
-## 4. Split an Entry Into Two
+This is where you enter the details of each flight.
 
-When editing an existing row:
+You can fill in:
 
-- click `Split into two`
-- adjust both entry blocks
-- save split entries
+- date
+- aircraft type
+- registration
+- pilot in command
+- flight details
+- instrument details
+- instruction details
+- single-engine and multi-engine time
+- landings
+- remarks
 
-The original row will be replaced by two consecutive rows in the same location.
+When you save, the row appears in the ledger and in the saved entry list.
 
-## 5. Delete Entries
+## 3. Saved Entry Stack
 
-Single delete:
+This is the list of saved entries beside the form.
 
-- use `Delete` on a card
-- or `Delete entry` inside the edit form
+You can use it to:
 
-Bulk delete:
+- quickly review saved rows
+- edit an entry
+- split an entry
+- move an entry up or down
+- delete an entry
+- select entries for bulk delete
+- include or remove entries from manual sum
 
-- select rows with checkboxes
-- use `Delete selected`
-- or `Delete all entries`
+## 4. Ledger View
 
-All destructive actions ask for confirmation first.
+This is the large paper-style logbook area.
 
-## 6. Reorder Entries
+It shows all saved entries in a traditional ledger layout.
 
-Use either:
+You can:
 
-- drag-and-drop in the saved entry stack
+- scroll across the full sheet
+- scroll down while keeping the header visible
+- click a row to edit it
+- switch into selection mode and select rows directly from the ledger
+- review totals at the bottom
+
+## How To Use The Website
+
+## 1. Add A New Entry
+
+1. Open the website.
+2. Fill in the flight details in the form.
+3. Click `Save entry`.
+
+The entry will immediately appear in the saved list and in the ledger.
+
+## 2. Edit An Entry
+
+You can edit from either place:
+
+- click `Edit` on a saved entry card
+- click the row directly in the ledger
+
+After making changes:
+
+1. click `Update entry`
+2. the row updates in place
+3. the page returns you to that logbook row so you can keep reviewing
+
+## 3. Split One Entry Into Two
+
+If one flight should become two separate rows:
+
+1. open the entry in edit mode
+2. click `Split into two`
+3. complete both entry sections
+4. save the split
+
+The original row will be replaced by two rows one after the other in the same position.
+
+## 4. Delete Entries
+
+### Delete one entry
+
+- click `Delete` on the saved card
+- or use `Delete entry` inside the edit form
+
+### Delete many entries together
+
+1. use the selection checkboxes in the saved list
+2. or use row selection where available
+3. click `Delete selected`
+
+### Delete everything
+
+- use `Delete all entries`
+
+The website asks for confirmation before destructive actions.
+
+## 5. Reorder Entries
+
+You can reorder rows using:
+
 - `Move up`
 - `Move down`
+- drag and drop in the saved entry stack
 
-The ledger order follows the saved stack order.
+The ledger updates to match the new order.
 
-## 7. Manual Sum Selection
+## 6. Use Automatic Totals
 
-The app supports:
+The website automatically totals the numeric columns for you.
 
-- automatic totals across all rows
-- manual subtotal based on selected rows
+This includes flight time and landing totals, plus the column totals shown at the bottom of the ledger.
 
-You can select rows for the subtotal by:
+You do not need to calculate those manually.
 
-- clicking the manual sum toggle on cards
+## 7. Use Manual Sum
+
+Manual sum lets you total only selected rows instead of the whole logbook.
+
+You can select rows for manual sum by:
+
+- using the `Sum on` / `Use in sum` option in the saved entry list
 - switching the ledger into row selection mode and clicking rows directly
 
-## 8. Visibility Controls
+The manual subtotal is shown in the ledger footer.
 
-Use the ledger toolbar to:
+Useful tip:
 
-- hide `0` / `0.0` values
-- hide empty columns that have no real values in any saved row
+- you can use shift-click range selection to select multiple entries faster
 
-## 9. Print the Sheet
+## 8. Hide Zero Values
 
-Click:
+If you want the sheet to be easier to read:
 
-```text
-Print sheet
-```
+- turn on `Hide 0 / 0.0 values`
 
-The app generates print-friendly landscape pages.
+This keeps zero-value cells blank on the ledger so the filled-in values stand out more clearly.
 
-Recommended print settings:
+It only changes how the sheet looks.
 
-- `Landscape`
-- `A4` if applicable
-- low or default margins depending on printer support
+It does not remove your stored values.
 
-The print flow uses generated print pages rather than trying to print the live scrolling ledger directly.
+## 9. Hide Empty Columns
 
-## 10. Sign In With Google
+If some columns are completely unused:
 
-Use:
+- turn on `Hide empty columns`
 
-```text
-Sign in with Google
-```
+This removes columns that do not contain any real data anywhere in the current logbook view.
 
-After sign-in:
+It helps reduce clutter and makes scanning easier.
 
-- the app writes or updates a readable user profile document in Firestore
-- the app loads the user’s cloud entries
-- the top panel changes to cloud status
+## 10. Print The Logbook
 
-## 11. Import Device Data Into Cloud
+When you are ready to print:
 
-While signed in:
+1. click `Print sheet`
+2. use landscape mode in the print dialog
+3. print or save as PDF
 
-- click `Import device data to cloud`
+The website prepares a print layout specifically for the logbook so it fits much better than the scrolling on-screen view.
 
-The app will:
+## 11. Sign In With Google
 
-- compare device entries with current cloud entries
-- avoid duplicating matching rows
-- append imported entries into the cloud logbook
+If you want your logbook to follow you across devices:
 
-This import remains available at any time.
+1. click `Sign in with Google`
+2. choose your Google account
+3. wait for cloud mode to activate
 
-## 12. Download a Backup
+After that:
 
-Click:
+- new saves go to cloud automatically
+- edits update cloud automatically
+- deletes update cloud automatically
+- reorder changes update cloud automatically
 
-```text
-Download backup
-```
+## 12. Import Device Entries Into Cloud
 
-This creates a JSON file containing:
+This option is useful when:
 
-- current active entries
-- selected subtotal rows
-- display preferences
-- export metadata
+- you created entries earlier in guest mode on this device
+- then later signed in and want those older device-only rows added to your cloud logbook
 
-## 13. Upload a Backup
+How to use it:
 
-Click:
+1. sign in with Google
+2. look at the `pending` count in the sync section
+3. if there are still device-only rows, click `Import device entries to cloud`
 
-```text
-Upload backup
-```
+The website is designed to avoid importing the same rows again once they are already represented in cloud.
 
-Choose a JSON backup created by the app.
+## 13. Download A Backup
 
-The app will replace the current active table with the imported data.
+To keep a backup copy of your logbook:
 
-Behavior depends on mode:
+1. click `Download backup`
+2. save the file somewhere safe
 
-- guest mode: replaces the device logbook
-- cloud mode: replaces the current cloud logbook
+This gives you a file you can keep for personal backup.
 
-## Firebase Setup Summary
+## 14. Upload A Backup
 
-This repository is already configured for:
+If you want to restore from a backup file:
 
-- Firebase Hosting
-- Firestore
-- Google Authentication
+1. click `Upload backup`
+2. choose a backup file created by this website
 
-Project:
+The uploaded backup replaces the current active table.
 
-- `pilot-logbook-by-uran`
+So only do this when you are sure you want to restore that file.
 
-Hosting URL:
+## 15. Use Undo And Redo
 
-- [https://pilot-logbook-by-uran.web.app](https://pilot-logbook-by-uran.web.app)
+Undo and redo work for saved actions in the current session.
 
-## Firestore Security Model
+You can use:
 
-The current Firestore rules enforce:
+- `Undo`
+- `Redo`
 
-- users can read only their own profile document
-- users can create and update only their own profile document
-- users can read only their own entries
-- users can create, update, and delete only their own entries
-- no public read/write access
+These are useful for things like:
 
-This keeps beta user data private by default.
-
-## How To Inspect User Data in Firebase Console
-
-To inspect users and entries:
-
-1. Open Firebase Console
-2. Open `Firestore Database`
-3. Go to `Data`
-4. Open `users`
-5. Click a user UID document
-6. Read the profile fields:
-   - display name
-   - email
-   - photo URL
-   - provider
-7. Open that document’s `entries` subcollection
-
-This makes it much easier to tell whose data is whose.
-
-## Deployment
-
-### Deploy Hosting
-
-```bash
-firebase deploy --only hosting
-```
-
-### Deploy Firestore Rules
-
-```bash
-firebase deploy --only firestore:rules
-```
-
-### Deploy Both
-
-```bash
-firebase deploy
-```
-
-## Local Development Notes
-
-- the app is a static frontend
-- there is no bundler
-- there is no custom backend server
-- files can be edited directly and refreshed in the browser
-
-When using a plain local server:
-
-- guest mode works
-- cloud sign-in is intentionally not the main target
-- the Firebase client falls back gracefully rather than breaking the app
-
-## Feature Checklist
-
-Current implemented features include:
-
-- paper-style 32-column ledger
-- compact entry form
-- local guest persistence
-- Google sign-in
-- Firebase cloud sync
-- readable Firestore user profiles
-- add/edit/delete workflow
-- split entry workflow
-- drag reorder
-- move buttons
-- bulk delete
-- delete from edit form
-- automatic totals
-- manual subtotal row selection
-- selection from ledger rows
-- sticky ledger header
-- hide zero values
-- hide empty columns
-- print-friendly landscape pages
-- JSON backup export
-- JSON backup import
-
-## Troubleshooting
-
-### Google sign-in does not open locally
-
-Use the Firebase-hosted site for sign-in and sync:
+- saving an entry
+- updating an entry
+- deleting rows
+- splitting rows
+- reordering rows
+- changing selection and display options
+
+Undo and redo are session-based, which means they are meant for the current open visit rather than permanent version history.
+
+## Best Everyday Workflow
+
+For most users, the simplest flow is:
+
+1. open the website
+2. start entering flights
+3. sign in with Google when you want cloud sync
+4. import older guest entries into cloud if needed
+5. keep using the site normally after that
+6. download a backup once in a while
+7. print the ledger when needed
+
+## What Makes This Website Useful
+
+- it feels like a proper pilot logbook instead of a generic spreadsheet
+- it works quickly for day-to-day entry
+- it remembers your data
+- it can move from simple guest use to cloud use without starting over
+- it makes totals and review easier
+- it supports printing in a format that matches the purpose of a real logbook
+
+## Quick Tips
+
+- If you are not signed in, your entries stay on that device only.
+- If you are signed in and cloud mode is active, your normal changes are autosaved to cloud.
+- The import button is for older device-only rows, not for everyday saving.
+- Use `Hide 0 / 0.0 values` when you want the sheet to feel cleaner.
+- Use `Hide empty columns` when you want a tighter, easier-to-read ledger.
+- Use `Download backup` before big cleanup or import actions if you want extra peace of mind.
+
+## Live Website
 
 [https://pilot-logbook-by-uran.web.app](https://pilot-logbook-by-uran.web.app)
-
-Plain local servers are primarily for guest-mode development and UI testing.
-
-### Entries disappeared after changing browser or device
-
-In guest mode, entries are tied to the browser/device.
-
-Use either:
-
-- Google sign-in for cloud sync
-- `Download backup` to keep your own JSON copy
-
-### Import says no new device entries are available
-
-That usually means the current cloud logbook already contains matching rows from this device.
-
-### The print view looks different from the on-screen ledger
-
-This is expected.
-
-The app uses a separate print-optimized layout to fit the ledger better on landscape paper.
-
-### GitHub secret warning appeared
-
-The current code no longer hardcodes Firebase config in tracked source. The app now loads Firebase config at runtime from Firebase Hosting.
-
-## Future Expansion Ideas
-
-The current architecture leaves room for:
-
-- richer aircraft database
-- endorsements and instructor records
-- custom dashboards
-- PDF export improvements
-- team/admin tools
-- premium features
-- payment integration later
-- deeper analytics
-
-## License / Ownership
-
-Project built and maintained as Pilot Logbook Atelier by Uran Khatola.
