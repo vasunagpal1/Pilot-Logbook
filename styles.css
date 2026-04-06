@@ -342,23 +342,23 @@ body::before {
 .format-toggle {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px;
   justify-content: center;
   align-items: center;
   justify-self: center;
-  padding: 6px;
+  padding: 8px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.09);
 }
 
 .format-toggle__button {
-  min-width: 88px;
-  min-height: 40px;
-  padding: 9px 16px;
+  min-width: 108px;
+  min-height: 52px;
+  padding: 11px 20px;
   font-family: "JetBrains Mono", monospace;
-  font-size: 0.82rem;
-  letter-spacing: 0.04em;
+  font-size: 0.98rem;
+  letter-spacing: 0.05em;
 }
 
 .format-toggle__button.is-selected {
