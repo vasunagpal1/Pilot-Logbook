@@ -121,11 +121,6 @@ body::before {
   width: 100%;
 }
 
-.sync-panel--actions,
-.sync-panel--session {
-  grid-column: 2;
-}
-
 .sync-panel--session {
   align-self: end;
 }
