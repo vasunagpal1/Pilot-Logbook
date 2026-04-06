@@ -102,8 +102,8 @@ body::before {
 .sync-console {
   margin-top: 20px;
   display: grid;
-  grid-template-columns: minmax(0, 1.18fr) minmax(320px, 0.82fr);
-  gap: 12px;
+  grid-template-columns: minmax(320px, 760px);
+  justify-content: center;
   align-items: start;
 }
 
@@ -118,7 +118,7 @@ body::before {
 }
 
 .sync-panel--access {
-  grid-row: 1 / span 2;
+  width: 100%;
 }
 
 .sync-panel--actions,
@@ -659,7 +659,12 @@ body::before {
   display: grid;
   gap: 10px;
   align-content: start;
+  justify-items: center;
   min-height: 0;
+}
+
+.hero-sidepanels .sync-panel {
+  width: min(100%, 720px);
 }
 
 .panel-scroll {
