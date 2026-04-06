@@ -60,40 +60,6 @@
               Start logging on this device. Sign in when you want cloud sync.
             </p>
           </article>
-
-          <article class="sync-panel sync-panel--actions">
-            <div class="sync-panel__header">
-              <p class="sync-console__eyebrow">Actions</p>
-            </div>
-            <div class="sync-action-list">
-              <button type="button" class="button button-ghost sync-action-button" id="import-local-button" data-icon="↑">
-                Import device data to cloud
-              </button>
-              <button type="button" class="button button-ghost sync-action-button" id="export-data-button" data-icon="↓">
-                Download backup
-              </button>
-              <button type="button" class="button button-ghost sync-action-button" id="import-file-button" data-icon="↑">
-                Upload backup
-              </button>
-              <input id="import-file-input" type="file" accept="application/json,.json" hidden />
-            </div>
-          </article>
-
-          <article class="sync-panel sync-panel--session">
-            <div class="sync-panel__header">
-              <p class="sync-console__eyebrow">Session</p>
-            </div>
-            <div class="history-console" aria-label="Undo and redo controls">
-              <div class="history-console__actions">
-                <button type="button" class="button button-ghost history-button" id="undo-button">&larr; Undo</button>
-                <button type="button" class="button button-ghost history-button" id="redo-button">Redo &rarr;</button>
-              </div>
-            </div>
-            <p id="history-status" class="history-console__status">
-              Session undo is ready. New saved changes will appear here.
-            </p>
-            <p id="sync-feedback" class="sync-console__feedback" aria-live="polite"></p>
-          </article>
         </section>
       </div>
 
@@ -144,64 +110,41 @@
           </article>
         </div>
 
-        <section class="panel panel-manifest">
-          <div class="panel-heading">
-            <div>
-              <p class="panel-kicker">Saved Ledger</p>
-              <h2>Entry stack</h2>
+        <div class="hero-sidepanels">
+          <article class="sync-panel sync-panel--actions">
+            <div class="sync-panel__header">
+              <p class="sync-console__eyebrow">Actions</p>
             </div>
-            <p id="manifest-status" class="panel-status">Drag cards to reorder the printed ledger rows.</p>
-          </div>
-
-          <div class="panel-scroll panel-scroll--manifest">
-            <div class="sum-console">
-              <div>
-                <p class="sum-console__label">Sum control</p>
-                <p id="sum-status" class="sum-console__status">
-                  Default totals include every saved row.
-                </p>
-              </div>
-              <div class="sum-console__actions">
-                <button type="button" class="mini-button" data-sum-action="select-all">
-                  Select all
-                </button>
-                <button type="button" class="mini-button" data-sum-action="clear">
-                  Clear
-                </button>
-              </div>
+            <div class="sync-action-list">
+              <button type="button" class="button button-ghost sync-action-button" id="import-local-button" data-icon="↑">
+                Import device data to cloud
+              </button>
+              <button type="button" class="button button-ghost sync-action-button" id="export-data-button" data-icon="↓">
+                Download backup
+              </button>
+              <button type="button" class="button button-ghost sync-action-button" id="import-file-button" data-icon="↑">
+                Upload backup
+              </button>
+              <input id="import-file-input" type="file" accept="application/json,.json" hidden />
             </div>
+          </article>
 
-            <div class="bulk-console">
-              <div>
-                <p class="bulk-console__label">Bulk actions</p>
-                <p id="bulk-status" class="bulk-console__status">
-                  Select entries and delete them together.
-                </p>
-              </div>
-              <div class="bulk-console__actions">
-                <button type="button" class="mini-button" data-bulk-action="select-all">
-                  Select all entries
-                </button>
-                <button type="button" class="mini-button" data-bulk-action="clear">
-                  Clear selection
-                </button>
-                <button type="button" class="mini-button mini-button-danger" id="delete-selected" data-bulk-action="delete-selected">
-                  Delete selected
-                </button>
-                <button type="button" class="mini-button mini-button-danger" id="delete-all" data-bulk-action="delete-all">
-                  Delete all entries
-                </button>
+          <article class="sync-panel sync-panel--session">
+            <div class="sync-panel__header">
+              <p class="sync-console__eyebrow">Session</p>
+            </div>
+            <div class="history-console" aria-label="Undo and redo controls">
+              <div class="history-console__actions">
+                <button type="button" class="button button-ghost history-button" id="undo-button">&larr; Undo</button>
+                <button type="button" class="button button-ghost history-button" id="redo-button">Redo &rarr;</button>
               </div>
             </div>
-
-            <div id="empty-state" class="empty-state">
-              <p>No flights saved yet.</p>
-              <span>Add your first entry and it will appear here and on the sheet.</span>
-            </div>
-
-            <ul id="entry-list" class="entry-list" aria-label="Saved entries"></ul>
-          </div>
-        </section>
+            <p id="history-status" class="history-console__status">
+              Session undo is ready. New saved changes will appear here.
+            </p>
+            <p id="sync-feedback" class="sync-console__feedback" aria-live="polite"></p>
+          </article>
+        </div>
       </div>
     </header>
 
@@ -465,6 +408,65 @@
                   </button>
                 </div>
               </form>
+            </div>
+          </section>
+
+          <section class="panel panel-manifest">
+            <div class="panel-heading">
+              <div>
+                <p class="panel-kicker">Saved Ledger</p>
+                <h2>Entry stack</h2>
+              </div>
+              <p id="manifest-status" class="panel-status">Drag cards to reorder the printed ledger rows.</p>
+            </div>
+
+            <div class="panel-scroll panel-scroll--manifest">
+              <div class="sum-console">
+                <div>
+                  <p class="sum-console__label">Sum control</p>
+                  <p id="sum-status" class="sum-console__status">
+                    Default totals include every saved row.
+                  </p>
+                </div>
+                <div class="sum-console__actions">
+                  <button type="button" class="mini-button" data-sum-action="select-all">
+                    Select all
+                  </button>
+                  <button type="button" class="mini-button" data-sum-action="clear">
+                    Clear
+                  </button>
+                </div>
+              </div>
+
+              <div class="bulk-console">
+                <div>
+                  <p class="bulk-console__label">Bulk actions</p>
+                  <p id="bulk-status" class="bulk-console__status">
+                    Select entries and delete them together.
+                  </p>
+                </div>
+                <div class="bulk-console__actions">
+                  <button type="button" class="mini-button" data-bulk-action="select-all">
+                    Select all entries
+                  </button>
+                  <button type="button" class="mini-button" data-bulk-action="clear">
+                    Clear selection
+                  </button>
+                  <button type="button" class="mini-button mini-button-danger" id="delete-selected" data-bulk-action="delete-selected">
+                    Delete selected
+                  </button>
+                  <button type="button" class="mini-button mini-button-danger" id="delete-all" data-bulk-action="delete-all">
+                    Delete all entries
+                  </button>
+                </div>
+              </div>
+
+              <div id="empty-state" class="empty-state">
+                <p>No flights saved yet.</p>
+                <span>Add your first entry and it will appear here and on the sheet.</span>
+              </div>
+
+              <ul id="entry-list" class="entry-list" aria-label="Saved entries"></ul>
             </div>
           </section>
         </div>
