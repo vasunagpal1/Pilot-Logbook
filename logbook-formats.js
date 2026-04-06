@@ -568,13 +568,15 @@ export const LOGBOOK_FORMATS = {
     formMarkup: `
       <section class="form-section format-section" data-format="faa">
         <div class="section-header">
-          <h3>Flight identification</h3>
-          <p>Date, aircraft, and route</p>
+          <h3>Core details</h3>
+          <p>Columns 1 to 5 and 28</p>
         </div>
-        <div class="form-grid form-grid--five faa-grid--tight">
+        <div class="form-grid faa-grid--identity">
           <label class="field"><span>Date</span><input type="date" name="date" required /></label>
           <label class="field"><span>Make &amp; model</span><input type="text" name="makeModel" placeholder="C172 / PA28-140" required /></label>
           <label class="field"><span>Aircraft ID</span><input type="text" name="aircraftId" placeholder="N123AB" required /></label>
+        </div>
+        <div class="form-grid form-grid--two faa-grid--route">
           <label class="field"><span>From</span><input type="text" name="routeFrom" placeholder="FALA" required /></label>
           <label class="field"><span>To</span><input type="text" name="routeTo" placeholder="FAGC" required /></label>
         </div>
@@ -585,54 +587,59 @@ export const LOGBOOK_FORMATS = {
       </section>
       <section class="form-section format-section" data-format="faa">
         <div class="section-header">
-          <h3>Landings, totals, and category/class</h3>
-          <p>Flight totals and aircraft category</p>
+          <h3>Landings and pilot time</h3>
+          <p>Columns 6 to 15</p>
         </div>
-        <div class="form-grid form-grid--four faa-grid--balanced">
-          <label class="field"><span>Landings day</span><input type="number" name="landingsDay" min="0" step="1" placeholder="1" /></label>
-          <label class="field"><span>Landings night</span><input type="number" name="landingsNight" min="0" step="1" placeholder="0" /></label>
-          <label class="field"><span>Night PIC landings</span><input type="number" name="landingsNightPic" min="0" step="1" placeholder="0" /></label>
-          <label class="field"><span>Total flight time</span><input type="number" name="totalFlightTime" min="0" step="0.1" placeholder="1.4" /></label>
-          <label class="field"><span>Single engine</span><input type="number" name="categorySingleEngine" min="0" step="0.1" placeholder="1.4" /></label>
-          <label class="field"><span>Multi engine</span><input type="number" name="categoryMultiEngine" min="0" step="0.1" placeholder="0.0" /></label>
-          <label class="field"><span>PIC</span><input type="number" name="pilotTimePic" min="0" step="0.1" placeholder="1.2" /></label>
-          <label class="field"><span>Solo</span><input type="number" name="pilotTimeSolo" min="0" step="0.1" placeholder="0.0" /></label>
-        </div>
-      </section>
-      <section class="form-section format-section" data-format="faa">
-        <div class="section-header">
-          <h3>Pilot time, cross-country, night, and instrument</h3>
-          <p>FAA logbook columns 14 to 27</p>
-        </div>
-        <div class="matrix-grid matrix-grid--faa">
-          <article class="matrix-card">
-            <div class="matrix-title"><h4>Type of pilot time</h4><p>Cols 14 to 15</p></div>
+        <div class="instruction-groups instruction-groups--equal">
+          <article class="matrix-card instruction-card">
+            <div class="matrix-title"><h4>Landings and totals</h4><p>Cols 6 to 9</p></div>
             <div class="form-grid form-grid--two">
+              <label class="field"><span>Landings day</span><input type="number" name="landingsDay" min="0" step="1" placeholder="1" /></label>
+              <label class="field"><span>Landings night</span><input type="number" name="landingsNight" min="0" step="1" placeholder="0" /></label>
+              <label class="field"><span>Night PIC landings</span><input type="number" name="landingsNightPic" min="0" step="1" placeholder="0" /></label>
+              <label class="field"><span>Total flight time</span><input type="number" name="totalFlightTime" min="0" step="0.1" placeholder="1.4" /></label>
+            </div>
+          </article>
+          <article class="matrix-card instruction-card">
+            <div class="matrix-title"><h4>Category and pilot time</h4><p>Cols 10 to 15</p></div>
+            <div class="form-grid form-grid--two">
+              <label class="field"><span>Single engine</span><input type="number" name="categorySingleEngine" min="0" step="0.1" placeholder="1.4" /></label>
+              <label class="field"><span>Multi engine</span><input type="number" name="categoryMultiEngine" min="0" step="0.1" placeholder="0.0" /></label>
+              <label class="field"><span>PIC</span><input type="number" name="pilotTimePic" min="0" step="0.1" placeholder="1.2" /></label>
+              <label class="field"><span>Solo</span><input type="number" name="pilotTimeSolo" min="0" step="0.1" placeholder="0.0" /></label>
               <label class="field"><span>Dual received</span><input type="number" name="pilotTimeDualReceived" min="0" step="0.1" placeholder="1.0" /></label>
               <label class="field"><span>Dual given</span><input type="number" name="pilotTimeDualGiven" min="0" step="0.1" placeholder="0.0" /></label>
             </div>
           </article>
+        </div>
+      </section>
+      <section class="form-section format-section" data-format="faa">
+        <div class="section-header">
+          <h3>Cross-country, night, and instrument</h3>
+          <p>Columns 16 to 27</p>
+        </div>
+        <div class="matrix-grid matrix-grid--faa">
           <article class="matrix-card">
             <div class="matrix-title"><h4>Cross country</h4><p>Cols 16 to 20</p></div>
-            <div class="form-grid form-grid--three">
+            <div class="form-grid form-grid--two">
               <label class="field"><span>Total</span><input type="number" name="crossCountryTotal" min="0" step="0.1" placeholder="0.0" /></label>
               <label class="field"><span>Over 50 N.M.</span><input type="number" name="crossCountryOver50Nm" min="0" step="0.1" placeholder="0.0" /></label>
               <label class="field"><span>Dual received</span><input type="number" name="crossCountryDualReceived" min="0" step="0.1" placeholder="0.0" /></label>
               <label class="field"><span>XC solo</span><input type="number" name="crossCountrySolo" min="0" step="0.1" placeholder="0.0" /></label>
-              <label class="field"><span>XC PIC</span><input type="number" name="crossCountryPic" min="0" step="0.1" placeholder="0.0" /></label>
+              <label class="field field--stretch"><span>XC PIC</span><input type="number" name="crossCountryPic" min="0" step="0.1" placeholder="0.0" /></label>
             </div>
           </article>
           <article class="matrix-card">
             <div class="matrix-title"><h4>Night</h4><p>Cols 21 to 23</p></div>
-            <div class="form-grid form-grid--three">
+            <div class="form-grid form-grid--two">
               <label class="field"><span>Total</span><input type="number" name="nightTotal" min="0" step="0.1" placeholder="0.0" /></label>
               <label class="field"><span>Dual received</span><input type="number" name="nightDualReceived" min="0" step="0.1" placeholder="0.0" /></label>
-              <label class="field"><span>Night PIC</span><input type="number" name="nightPic" min="0" step="0.1" placeholder="0.0" /></label>
+              <label class="field field--stretch"><span>Night PIC</span><input type="number" name="nightPic" min="0" step="0.1" placeholder="0.0" /></label>
             </div>
           </article>
           <article class="matrix-card">
             <div class="matrix-title"><h4>Instrument</h4><p>Cols 24 to 27</p></div>
-            <div class="form-grid form-grid--four">
+            <div class="form-grid form-grid--two">
               <label class="field"><span>Actual</span><input type="number" name="instrumentActual" min="0" step="0.1" placeholder="0.0" /></label>
               <label class="field"><span>Simulated</span><input type="number" name="instrumentSimulated" min="0" step="0.1" placeholder="0.0" /></label>
               <label class="field"><span>Approaches</span><input type="number" name="instrumentApproaches" min="0" step="1" placeholder="0" /></label>

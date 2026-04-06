@@ -1252,8 +1252,16 @@ async function deleteEntry(entryId) {
     return;
   }
 
+  const config = getActiveFormatConfig();
+  const deleteLabel = [
+    config.cardTitle(entry, { formatLedgerDate }),
+    config.cardSubtitle(entry),
+  ]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .join(" • ");
   const ok = window.confirm(
-    `Delete the entry for ${formatLedgerDate(entry.date)} ${entry.type} ${entry.registration}?`
+    `Delete the entry for ${deleteLabel}?`
   );
   if (!ok) {
     return;
