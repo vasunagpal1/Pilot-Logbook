@@ -665,6 +665,8 @@ body::before {
 
 .hero-sidepanels .sync-panel {
   width: min(100%, 720px);
+  justify-self: center;
+  margin-inline: auto;
 }
 
 .panel-scroll {
