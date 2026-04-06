@@ -143,6 +143,65 @@
             <p id="summary-me-dual" class="stat-value stat-value--compact">0.0</p>
           </article>
         </div>
+
+        <section class="panel panel-manifest">
+          <div class="panel-heading">
+            <div>
+              <p class="panel-kicker">Saved Ledger</p>
+              <h2>Entry stack</h2>
+            </div>
+            <p id="manifest-status" class="panel-status">Drag cards to reorder the printed ledger rows.</p>
+          </div>
+
+          <div class="panel-scroll panel-scroll--manifest">
+            <div class="sum-console">
+              <div>
+                <p class="sum-console__label">Sum control</p>
+                <p id="sum-status" class="sum-console__status">
+                  Default totals include every saved row.
+                </p>
+              </div>
+              <div class="sum-console__actions">
+                <button type="button" class="mini-button" data-sum-action="select-all">
+                  Select all
+                </button>
+                <button type="button" class="mini-button" data-sum-action="clear">
+                  Clear
+                </button>
+              </div>
+            </div>
+
+            <div class="bulk-console">
+              <div>
+                <p class="bulk-console__label">Bulk actions</p>
+                <p id="bulk-status" class="bulk-console__status">
+                  Select entries and delete them together.
+                </p>
+              </div>
+              <div class="bulk-console__actions">
+                <button type="button" class="mini-button" data-bulk-action="select-all">
+                  Select all entries
+                </button>
+                <button type="button" class="mini-button" data-bulk-action="clear">
+                  Clear selection
+                </button>
+                <button type="button" class="mini-button mini-button-danger" id="delete-selected" data-bulk-action="delete-selected">
+                  Delete selected
+                </button>
+                <button type="button" class="mini-button mini-button-danger" id="delete-all" data-bulk-action="delete-all">
+                  Delete all entries
+                </button>
+              </div>
+            </div>
+
+            <div id="empty-state" class="empty-state">
+              <p>No flights saved yet.</p>
+              <span>Add your first entry and it will appear here and on the sheet.</span>
+            </div>
+
+            <ul id="entry-list" class="entry-list" aria-label="Saved entries"></ul>
+          </div>
+        </section>
       </div>
     </header>
 
@@ -406,65 +465,6 @@
                   </button>
                 </div>
               </form>
-            </div>
-          </section>
-
-          <section class="panel panel-manifest">
-            <div class="panel-heading">
-              <div>
-                <p class="panel-kicker">Saved Ledger</p>
-                <h2>Entry stack</h2>
-              </div>
-              <p id="manifest-status" class="panel-status">Drag cards to reorder the printed ledger rows.</p>
-            </div>
-
-            <div class="panel-scroll panel-scroll--manifest">
-              <div class="sum-console">
-                <div>
-                  <p class="sum-console__label">Sum control</p>
-                  <p id="sum-status" class="sum-console__status">
-                    Default totals include every saved row.
-                  </p>
-                </div>
-                <div class="sum-console__actions">
-                  <button type="button" class="mini-button" data-sum-action="select-all">
-                    Select all
-                  </button>
-                  <button type="button" class="mini-button" data-sum-action="clear">
-                    Clear
-                  </button>
-                </div>
-              </div>
-
-              <div class="bulk-console">
-                <div>
-                  <p class="bulk-console__label">Bulk actions</p>
-                  <p id="bulk-status" class="bulk-console__status">
-                    Select entries and delete them together.
-                  </p>
-                </div>
-                <div class="bulk-console__actions">
-                  <button type="button" class="mini-button" data-bulk-action="select-all">
-                    Select all entries
-                  </button>
-                  <button type="button" class="mini-button" data-bulk-action="clear">
-                    Clear selection
-                  </button>
-                  <button type="button" class="mini-button mini-button-danger" id="delete-selected" data-bulk-action="delete-selected">
-                    Delete selected
-                  </button>
-                  <button type="button" class="mini-button mini-button-danger" id="delete-all" data-bulk-action="delete-all">
-                    Delete all entries
-                  </button>
-                </div>
-              </div>
-
-              <div id="empty-state" class="empty-state">
-                <p>No flights saved yet.</p>
-                <span>Add your first entry and it will appear here and on the sheet.</span>
-              </div>
-
-              <ul id="entry-list" class="entry-list" aria-label="Saved entries"></ul>
             </div>
           </section>
         </div>

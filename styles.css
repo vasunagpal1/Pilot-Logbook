@@ -489,7 +489,9 @@ body::before {
 .hero-metrics {
   display: grid;
   gap: 10px;
-  align-content: start;
+  align-content: stretch;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  min-height: 0;
 }
 
 .hero-cards {
@@ -559,7 +561,7 @@ body::before {
 
 .entry-zone {
   display: grid;
-  grid-template-columns: minmax(0, 1.42fr) minmax(360px, 0.98fr);
+  grid-template-columns: 1fr;
   gap: 14px;
   align-items: stretch;
 }
@@ -587,10 +589,16 @@ body::before {
   align-self: stretch;
 }
 
+.hero-metrics > .panel-manifest {
+  min-height: 0;
+  height: 100%;
+}
+
 .panel-scroll {
   min-height: 0;
   padding-right: 4px;
   scrollbar-gutter: stable;
+  overflow-y: auto;
 }
 
 .panel-scroll--manifest {
@@ -1427,13 +1435,12 @@ body::before {
 }
 
 @media (min-width: 1181px) {
-  .panel-form,
-  .panel-manifest {
+  .panel-form {
     height: calc(100vh - 168px);
     max-height: calc(100vh - 168px);
   }
 
-  .panel-scroll {
+  .hero-metrics > .panel-manifest .panel-scroll--manifest {
     overflow-y: auto;
   }
 
@@ -1462,19 +1469,8 @@ body::before {
 }
 
 @media (max-width: 1180px) {
-  .hero-shell,
   .entry-zone {
     grid-template-columns: 1fr;
-  }
-
-  .panel-form,
-  .panel-manifest {
-    max-height: none;
-  }
-
-  .panel-scroll {
-    overflow: visible;
-    padding-right: 0;
   }
 
   .table-scroller {
@@ -1496,6 +1492,17 @@ body::before {
 @media (max-width: 920px) {
   .hero-shell {
     grid-template-columns: 1fr;
+  }
+
+  .panel-form,
+  .panel-manifest {
+    max-height: none;
+    height: auto;
+  }
+
+  .panel-scroll {
+    overflow: visible;
+    padding-right: 0;
   }
 
   .hero-copy h1 {
