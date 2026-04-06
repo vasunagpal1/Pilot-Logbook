@@ -59,6 +59,18 @@
             <p id="sync-summary" class="sync-console__summary sync-console__summary--note">
               Start logging on this device. Sign in when you want cloud sync.
             </p>
+            <div class="format-switcher">
+              <div class="format-switcher__copy">
+                <p class="sync-console__eyebrow">Logbook format</p>
+                <p id="format-switcher-status" class="format-switcher__status">
+                  SACAA is active right now.
+                </p>
+              </div>
+              <div id="format-toggle" class="format-toggle" role="group" aria-label="Logbook format selector">
+                <button type="button" class="mini-button is-selected" data-format-key="sacaa">SACAA</button>
+                <button type="button" class="mini-button" data-format-key="faa">FAA</button>
+              </div>
+            </div>
           </article>
         </section>
       </div>
@@ -85,28 +97,28 @@
 
         <div class="hero-substats" aria-label="Training totals">
           <article class="stat-card stat-card--compact">
-            <p class="stat-label">IF Actual</p>
-            <p id="summary-if-actual" class="stat-value stat-value--compact">0.0</p>
+            <p id="summary-label-1" class="stat-label">IF Actual</p>
+            <p id="summary-value-1" class="stat-value stat-value--compact">0.0</p>
           </article>
           <article class="stat-card stat-card--compact">
-            <p class="stat-label">FSTD</p>
-            <p id="summary-fstd" class="stat-value stat-value--compact">0.0</p>
+            <p id="summary-label-2" class="stat-label">FSTD</p>
+            <p id="summary-value-2" class="stat-value stat-value--compact">0.0</p>
           </article>
           <article class="stat-card stat-card--compact">
-            <p class="stat-label">SE Dual</p>
-            <p id="summary-se-dual" class="stat-value stat-value--compact">0.0</p>
+            <p id="summary-label-3" class="stat-label">SE Dual</p>
+            <p id="summary-value-3" class="stat-value stat-value--compact">0.0</p>
           </article>
           <article class="stat-card stat-card--compact">
-            <p class="stat-label">PIC Day</p>
-            <p id="summary-pic-day" class="stat-value stat-value--compact">0.0</p>
+            <p id="summary-label-4" class="stat-label">PIC Day</p>
+            <p id="summary-value-4" class="stat-value stat-value--compact">0.0</p>
           </article>
           <article class="stat-card stat-card--compact">
-            <p class="stat-label">PIC Night</p>
-            <p id="summary-pic-night" class="stat-value stat-value--compact">0.0</p>
+            <p id="summary-label-5" class="stat-label">PIC Night</p>
+            <p id="summary-value-5" class="stat-value stat-value--compact">0.0</p>
           </article>
           <article class="stat-card stat-card--compact">
-            <p class="stat-label">ME Dual</p>
-            <p id="summary-me-dual" class="stat-value stat-value--compact">0.0</p>
+            <p id="summary-label-6" class="stat-label">ME Dual</p>
+            <p id="summary-value-6" class="stat-value stat-value--compact">0.0</p>
           </article>
         </div>
 
@@ -164,220 +176,7 @@
 
             <div class="panel-scroll panel-scroll--form" id="entry-form-scroll">
               <form id="entry-form" class="entry-form" autocomplete="off">
-                <section class="form-section">
-                  <div class="section-header">
-                    <h3>Core details</h3>
-                    <p>Columns 1 to 5</p>
-                  </div>
-                  <div class="form-grid form-grid--two">
-                    <label class="field">
-                      <span>Date</span>
-                      <input type="date" name="date" required />
-                    </label>
-                    <label class="field">
-                      <span>Type</span>
-                      <input type="text" name="type" placeholder="C152 / FNPT-II" required />
-                    </label>
-                    <label class="field">
-                      <span>Registration</span>
-                      <input type="text" name="registration" placeholder="ZS-ABC" required />
-                    </label>
-                    <label class="field">
-                      <span>Pilot in command</span>
-                      <input type="text" name="pilotInCommand" placeholder="W. Kowour / SELF" required />
-                    </label>
-                  </div>
-                  <label class="field">
-                    <span>Details of flight and remarks</span>
-                    <textarea
-                      name="flightDetails"
-                      rows="3"
-                      placeholder="Sector, route, procedures, nav exercise, altitude, or training notes"
-                    ></textarea>
-                  </label>
-                </section>
-
-                <section class="form-section">
-                  <div class="section-header">
-                    <h3>Instrument and instruction</h3>
-                    <p>Columns 6 to 13</p>
-                  </div>
-                  <div class="form-grid form-grid--four">
-                    <label class="field">
-                      <span>NavAids</span>
-                      <input type="text" name="navaids" placeholder="ILS / VOR / ADF" />
-                    </label>
-                    <label class="field">
-                      <span>Instrument place</span>
-                      <input type="text" name="instrumentPlace" placeholder="FALA / FNAB" />
-                    </label>
-                    <label class="field">
-                      <span>Instrument actual</span>
-                      <input type="number" name="instrumentActual" min="0" step="0.1" placeholder="1.4" />
-                    </label>
-                    <label class="field">
-                      <span>Instrument FSTD</span>
-                      <input type="number" name="instrumentFstd" min="0" step="0.1" placeholder="1.3" />
-                    </label>
-                  </div>
-                  <div class="instruction-groups">
-                    <article class="matrix-card instruction-card instruction-card--wide">
-                      <div class="matrix-title">
-                        <h4>Instructor</h4>
-                        <p>Cols 10 to 12</p>
-                      </div>
-                      <div class="form-grid form-grid--three">
-                        <label class="field">
-                          <span>SE</span>
-                          <input type="number" name="instructorSE" min="0" step="0.1" placeholder="0.8" />
-                        </label>
-                        <label class="field">
-                          <span>ME</span>
-                          <input type="number" name="instructorME" min="0" step="0.1" placeholder="0.4" />
-                        </label>
-                        <label class="field">
-                          <span>FSTD 1</span>
-                          <input type="number" name="fstdPrimary" min="0" step="0.1" placeholder="1.0" />
-                        </label>
-                      </div>
-                    </article>
-
-                    <article class="matrix-card instruction-card">
-                      <div class="matrix-title">
-                        <h4>FSTD 2</h4>
-                        <p>Col 13</p>
-                      </div>
-                      <label class="field">
-                        <span>FSTD</span>
-                        <input type="number" name="fstdSecondary" min="0" step="0.1" placeholder="1.0" />
-                      </label>
-                    </article>
-                  </div>
-                </section>
-
-                <section class="form-section">
-                  <div class="section-header">
-                    <h3>Aircraft time</h3>
-                    <p>Columns 14 to 31</p>
-                  </div>
-
-                  <div class="matrix-grid">
-                    <article class="matrix-card">
-                      <div class="matrix-title">
-                        <h4>Single-engine day</h4>
-                        <p>Cols 14 to 17</p>
-                      </div>
-                      <div class="form-grid form-grid--two">
-                        <label class="field">
-                          <span>Dual</span>
-                          <input type="number" name="seDayDual" min="0" step="0.1" placeholder="0.0" />
-                        </label>
-                        <label class="field">
-                          <span>PIC</span>
-                          <input type="number" name="seDayPic" min="0" step="0.1" placeholder="0.0" />
-                        </label>
-                        <label class="field">
-                          <span>PICUS</span>
-                          <input type="number" name="seDayPicus" min="0" step="0.1" placeholder="0.0" />
-                        </label>
-                        <label class="field">
-                          <span>Copilot</span>
-                          <input type="number" name="seDayCopilot" min="0" step="0.1" placeholder="0.0" />
-                        </label>
-                      </div>
-                    </article>
-
-                    <article class="matrix-card">
-                      <div class="matrix-title">
-                        <h4>Single-engine night</h4>
-                        <p>Cols 18 to 21</p>
-                      </div>
-                      <div class="form-grid form-grid--two">
-                        <label class="field">
-                          <span>Dual</span>
-                          <input type="number" name="seNightDual" min="0" step="0.1" placeholder="0.0" />
-                        </label>
-                        <label class="field">
-                          <span>PIC</span>
-                          <input type="number" name="seNightPic" min="0" step="0.1" placeholder="0.0" />
-                        </label>
-                        <label class="field">
-                          <span>PICUS</span>
-                          <input type="number" name="seNightPicus" min="0" step="0.1" placeholder="0.0" />
-                        </label>
-                        <label class="field">
-                          <span>Copilot</span>
-                          <input type="number" name="seNightCopilot" min="0" step="0.1" placeholder="0.0" />
-                        </label>
-                      </div>
-                    </article>
-
-                    <article class="matrix-card">
-                      <div class="matrix-title">
-                        <h4>Multi-engine day</h4>
-                        <p>Cols 22 to 25</p>
-                      </div>
-                      <div class="form-grid form-grid--two">
-                        <label class="field">
-                          <span>Dual</span>
-                          <input type="number" name="meDayDual" min="0" step="0.1" placeholder="0.0" />
-                        </label>
-                        <label class="field">
-                          <span>PIC</span>
-                          <input type="number" name="meDayPic" min="0" step="0.1" placeholder="0.0" />
-                        </label>
-                        <label class="field">
-                          <span>PICUS</span>
-                          <input type="number" name="meDayPicus" min="0" step="0.1" placeholder="0.0" />
-                        </label>
-                        <label class="field">
-                          <span>Copilot</span>
-                          <input type="number" name="meDayCopilot" min="0" step="0.1" placeholder="0.0" />
-                        </label>
-                      </div>
-                    </article>
-
-                    <article class="matrix-card">
-                      <div class="matrix-title">
-                        <h4>Multi-engine night</h4>
-                        <p>Cols 26 to 29</p>
-                      </div>
-                      <div class="form-grid form-grid--two">
-                        <label class="field">
-                          <span>Dual</span>
-                          <input type="number" name="meNightDual" min="0" step="0.1" placeholder="0.0" />
-                        </label>
-                        <label class="field">
-                          <span>PIC</span>
-                          <input type="number" name="meNightPic" min="0" step="0.1" placeholder="0.0" />
-                        </label>
-                        <label class="field">
-                          <span>PICUS</span>
-                          <input type="number" name="meNightPicus" min="0" step="0.1" placeholder="0.0" />
-                        </label>
-                        <label class="field">
-                          <span>Copilot</span>
-                          <input type="number" name="meNightCopilot" min="0" step="0.1" placeholder="0.0" />
-                        </label>
-                      </div>
-                    </article>
-                  </div>
-
-                  <div class="form-grid form-grid--three">
-                    <label class="field">
-                      <span>Landings day</span>
-                      <input type="number" name="landingsDay" min="0" step="1" placeholder="1" />
-                    </label>
-                    <label class="field">
-                      <span>Landings night</span>
-                      <input type="number" name="landingsNight" min="0" step="1" placeholder="0" />
-                    </label>
-                    <label class="field field--stretch">
-                      <span>Remarks</span>
-                      <input type="text" name="remarks" placeholder="Extra notes, airports, checks, or carry-forward notes" />
-                    </label>
-                  </div>
-                </section>
+                <div id="format-form-sections"></div>
 
                 <section class="split-panel" id="split-panel" hidden>
                   <div class="section-header">
@@ -506,138 +305,19 @@
             <div class="paper-sheet">
               <div class="paper-title">
               <div>
-                <p class="paper-label">Pilot Logbook</p>
-                <h3>Flight entries ledger</h3>
+                <p id="paper-format-label" class="paper-label">Pilot Logbook</p>
+                <h3 id="paper-format-title">Flight entries ledger</h3>
               </div>
               <div class="paper-meta">
-                <p class="paper-subtitle">Styled after the 32-column training logbook layout.</p>
+                <p id="paper-format-subtitle" class="paper-subtitle">Styled after the 32-column training logbook layout.</p>
                 <p class="paper-credit">Made by Uran Khatola</p>
               </div>
               </div>
 
               <div class="table-scroller">
                 <table class="logbook-table" id="logbook-table">
-                  <colgroup>
-                    <col class="w-date" />
-                    <col class="w-type" />
-                    <col class="w-reg" />
-                    <col class="w-pic" />
-                    <col class="w-details" />
-                    <col class="w-nav" />
-                    <col class="w-small" />
-                    <col class="w-small" />
-                    <col class="w-small" />
-                    <col class="w-small" />
-                    <col class="w-small" />
-                    <col class="w-small" />
-                    <col class="w-small" />
-                    <col class="w-hour" />
-                    <col class="w-hour" />
-                    <col class="w-hour" />
-                    <col class="w-hour" />
-                    <col class="w-hour" />
-                    <col class="w-hour" />
-                    <col class="w-hour" />
-                    <col class="w-hour" />
-                    <col class="w-hour" />
-                    <col class="w-hour" />
-                    <col class="w-hour" />
-                    <col class="w-hour" />
-                    <col class="w-hour" />
-                    <col class="w-hour" />
-                    <col class="w-hour" />
-                    <col class="w-hour" />
-                    <col class="w-landings" />
-                    <col class="w-landings" />
-                    <col class="w-remarks" />
-                  </colgroup>
-                  <thead>
-                    <tr class="index-row">
-                      <th>(1)</th>
-                      <th>(2)</th>
-                      <th>(3)</th>
-                      <th>(4)</th>
-                      <th>(5)</th>
-                      <th>(6)</th>
-                      <th>(7)</th>
-                      <th>(8)</th>
-                      <th>(9)</th>
-                      <th>(10)</th>
-                      <th>(11)</th>
-                      <th>(12)</th>
-                      <th>(13)</th>
-                      <th>(14)</th>
-                      <th>(15)</th>
-                      <th>(16)</th>
-                      <th>(17)</th>
-                      <th>(18)</th>
-                      <th>(19)</th>
-                      <th>(20)</th>
-                      <th>(21)</th>
-                      <th>(22)</th>
-                      <th>(23)</th>
-                      <th>(24)</th>
-                      <th>(25)</th>
-                      <th>(26)</th>
-                      <th>(27)</th>
-                      <th>(28)</th>
-                      <th>(29)</th>
-                      <th>(30)</th>
-                      <th>(31)</th>
-                      <th>(32)</th>
-                    </tr>
-                    <tr class="group-row">
-                      <th rowspan="3">Date</th>
-                      <th rowspan="3">Type</th>
-                      <th rowspan="3">Registration</th>
-                      <th rowspan="3">Pilot in Command</th>
-                      <th rowspan="3">Details of flight and remarks</th>
-                      <th rowspan="3">
-                        NavAids
-                        <span>Brought into use</span>
-                      </th>
-                      <th colspan="3">Instrument</th>
-                      <th colspan="3">Instructor</th>
-                      <th colspan="1">FSTD</th>
-                      <th colspan="8">Single-Engine Aircraft</th>
-                      <th colspan="8">Multi-Engine Aircraft</th>
-                      <th colspan="2">Landings</th>
-                      <th rowspan="3">Remarks</th>
-                    </tr>
-                    <tr class="subgroup-row">
-                      <th rowspan="2">Place</th>
-                      <th rowspan="2">Actual</th>
-                      <th rowspan="2">FSTD</th>
-                      <th rowspan="2">SE</th>
-                      <th rowspan="2">ME</th>
-                      <th rowspan="2">FSTD</th>
-                      <th rowspan="2">FSTD</th>
-                      <th colspan="4">Day</th>
-                      <th colspan="4">Night</th>
-                      <th colspan="4">Day</th>
-                      <th colspan="4">Night</th>
-                      <th rowspan="2">Day</th>
-                      <th rowspan="2">Night</th>
-                    </tr>
-                    <tr class="micro-row">
-                      <th>Dual</th>
-                      <th>PIC</th>
-                      <th>PICUS</th>
-                      <th>Copilot</th>
-                      <th>Dual</th>
-                      <th>PIC</th>
-                      <th>PICUS</th>
-                      <th>Copilot</th>
-                      <th>Dual</th>
-                      <th>PIC</th>
-                      <th>PICUS</th>
-                      <th>Copilot</th>
-                      <th>Dual</th>
-                      <th>PIC</th>
-                      <th>PICUS</th>
-                      <th>Copilot</th>
-                    </tr>
-                  </thead>
+                  <colgroup id="ledger-colgroup"></colgroup>
+                  <thead id="ledger-head"></thead>
                   <tbody id="ledger-body"></tbody>
                   <tfoot id="ledger-footer"></tfoot>
                 </table>

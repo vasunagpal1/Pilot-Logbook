@@ -10,6 +10,71 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    function allowedLogbookEntryKeys() {
+      return [
+        'id',
+        'createdAt',
+        'updatedAt',
+        'sortOrder',
+        'format',
+        'date',
+        'type',
+        'registration',
+        'pilotInCommand',
+        'flightDetails',
+        'navaids',
+        'instrumentPlace',
+        'instrumentActual',
+        'instrumentFstd',
+        'instructorSE',
+        'instructorME',
+        'fstdPrimary',
+        'fstdSecondary',
+        'seDayDual',
+        'seDayPic',
+        'seDayPicus',
+        'seDayCopilot',
+        'seNightDual',
+        'seNightPic',
+        'seNightPicus',
+        'seNightCopilot',
+        'meDayDual',
+        'meDayPic',
+        'meDayPicus',
+        'meDayCopilot',
+        'meNightDual',
+        'meNightPic',
+        'meNightPicus',
+        'meNightCopilot',
+        'landingsDay',
+        'landingsNight',
+        'remarks',
+        'makeModel',
+        'aircraftId',
+        'routeFrom',
+        'routeTo',
+        'landingsNightPic',
+        'totalFlightTime',
+        'categorySingleEngine',
+        'categoryMultiEngine',
+        'pilotTimePic',
+        'pilotTimeSolo',
+        'pilotTimeDualReceived',
+        'pilotTimeDualGiven',
+        'crossCountryTotal',
+        'crossCountryOver50Nm',
+        'crossCountryDualReceived',
+        'crossCountrySolo',
+        'crossCountryPic',
+        'nightTotal',
+        'nightDualReceived',
+        'nightPic',
+        'instrumentSimulated',
+        'instrumentApproaches',
+        'instrumentHolds'
+      ];
+    }
+
     match /users/{userId} {
       allow read: if isOwner(userId);
       allow create, update: if isOwner(userId)
@@ -29,44 +94,15 @@ service cloud.firestore {
       allow read, list: if isOwner(userId);
       allow create, update: if isOwner(userId)
         && request.resource.data.id == entryId
-        && request.resource.data.keys().hasOnly([
-          'id',
-          'createdAt',
-          'updatedAt',
-          'sortOrder',
-          'date',
-          'type',
-          'registration',
-          'pilotInCommand',
-          'flightDetails',
-          'navaids',
-          'instrumentPlace',
-          'instrumentActual',
-          'instrumentFstd',
-          'instructorSE',
-          'instructorME',
-          'fstdPrimary',
-          'fstdSecondary',
-          'seDayDual',
-          'seDayPic',
-          'seDayPicus',
-          'seDayCopilot',
-          'seNightDual',
-          'seNightPic',
-          'seNightPicus',
-          'seNightCopilot',
-          'meDayDual',
-          'meDayPic',
-          'meDayPicus',
-          'meDayCopilot',
-          'meNightDual',
-          'meNightPic',
-          'meNightPicus',
-          'meNightCopilot',
-          'landingsDay',
-          'landingsNight',
-          'remarks'
-        ]);
+        && request.resource.data.keys().hasOnly(allowedLogbookEntryKeys());
+      allow delete: if isOwner(userId);
+    }
+
+    match /users/{userId}/formats/{formatId}/entries/{entryId} {
+      allow read, list: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && request.resource.data.id == entryId
+        && request.resource.data.keys().hasOnly(allowedLogbookEntryKeys());
       allow delete: if isOwner(userId);
     }
 

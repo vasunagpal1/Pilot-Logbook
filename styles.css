@@ -30,6 +30,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 html {
   scroll-behavior: smooth;
 }
@@ -314,6 +318,31 @@ body::before {
 
 .sync-console__summary--calm::before {
   background: #7be2d4;
+}
+
+.format-switcher {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.format-switcher__copy {
+  display: grid;
+  gap: 4px;
+}
+
+.format-switcher__status {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.82rem;
+}
+
+.format-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .sync-action-list,
@@ -725,6 +754,10 @@ body::before {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.form-grid--five {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .instruction-groups {
   display: grid;
   gap: 10px;
@@ -786,6 +819,18 @@ body::before {
   display: grid;
   gap: 10px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.matrix-grid--faa {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.faa-grid--tight {
+  grid-template-columns: 1.1fr 1.2fr 1fr 0.85fr 0.85fr;
+}
+
+.faa-grid--balanced {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .matrix-card {
@@ -1427,6 +1472,38 @@ body::before {
   width: 230px;
 }
 
+.w-faa-date {
+  width: 88px;
+}
+
+.w-faa-model {
+  width: 132px;
+}
+
+.w-faa-aircraft {
+  width: 96px;
+}
+
+.w-faa-route {
+  width: 92px;
+}
+
+.w-faa-narrow {
+  width: 60px;
+}
+
+.w-faa-hour {
+  width: 70px;
+}
+
+.w-faa-count {
+  width: 62px;
+}
+
+.w-faa-remarks {
+  width: 260px;
+}
+
 @media (min-width: 1680px) {
   .panel-form .form-section:first-of-type .form-grid--two {
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1526,6 +1603,7 @@ body::before {
 
   .hero-cards,
   .hero-substats,
+  .form-grid--five,
   .form-grid--four,
   .matrix-grid,
   .form-grid--three,

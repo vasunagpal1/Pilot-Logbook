@@ -22,6 +22,10 @@ import {
 
 const BATCH_LIMIT = 450;
 
+function getUserEntriesPath(uid, formatKey = "sacaa") {
+  return formatKey === "sacaa" ? ["users", uid, "entries"] : ["users", uid, "formats", formatKey, "entries"];
+}
+
 let firebaseServicesPromise;
 
 function getEmbeddedFirebaseConfig() {
@@ -121,9 +125,9 @@ export async function upsertUserProfile(user) {
   );
 }
 
-export async function loadUserEntries(uid) {
+export async function loadUserEntries(uid, formatKey = "sacaa") {
   const { db } = await getFirebaseServices();
-  const entriesQuery = query(collection(db, "users", uid, "entries"), orderBy("sortOrder", "asc"));
+  const entriesQuery = query(collection(db, ...getUserEntriesPath(uid, formatKey)), orderBy("sortOrder", "asc"));
   const snapshot = await getDocs(entriesQuery);
 
   return snapshot.docs.map((entryDoc) => ({
@@ -132,7 +136,7 @@ export async function loadUserEntries(uid) {
   }));
 }
 
-export async function upsertUserEntries(uid, entries) {
+export async function upsertUserEntries(uid, formatKey = "sacaa", entries) {
   if (!entries.length) {
     return;
   }
@@ -143,7 +147,7 @@ export async function upsertUserEntries(uid, entries) {
     const batch = writeBatch(db);
 
     entries.slice(index, index + BATCH_LIMIT).forEach((entry) => {
-      const entryRef = doc(db, "users", uid, "entries", entry.id);
+      const entryRef = doc(db, ...getUserEntriesPath(uid, formatKey), entry.id);
       batch.set(entryRef, entry, { merge: true });
     });
 
@@ -151,13 +155,13 @@ export async function upsertUserEntries(uid, entries) {
   }
 }
 
-export async function deleteUserEntry(uid, entryId) {
+export async function deleteUserEntry(uid, formatKey = "sacaa", entryId) {
   const { db } = await getFirebaseServices();
-  const entryRef = doc(db, "users", uid, "entries", entryId);
+  const entryRef = doc(db, ...getUserEntriesPath(uid, formatKey), entryId);
   await deleteDoc(entryRef);
 }
 
-export async function deleteUserEntries(uid, entryIds) {
+export async function deleteUserEntries(uid, formatKey = "sacaa", entryIds) {
   if (!entryIds.length) {
     return;
   }
@@ -168,7 +172,7 @@ export async function deleteUserEntries(uid, entryIds) {
     const batch = writeBatch(db);
 
     entryIds.slice(index, index + BATCH_LIMIT).forEach((entryId) => {
-      const entryRef = doc(db, "users", uid, "entries", entryId);
+      const entryRef = doc(db, ...getUserEntriesPath(uid, formatKey), entryId);
       batch.delete(entryRef);
     });
 

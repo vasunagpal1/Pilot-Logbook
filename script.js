@@ -8,126 +8,39 @@ import {
   upsertUserProfile,
   upsertUserEntries,
 } from "./firebase-client.js";
+import {
+  DEFAULT_FORMAT_KEY,
+  getFormatConfig,
+  getFormatOptions,
+} from "./logbook-formats.js";
 
-const STORAGE_KEY = "pilot-logbook-atelier-v1";
-const SUM_SELECTION_KEY = "pilot-logbook-atelier-sum-selection-v1";
-const DISPLAY_PREFERENCES_KEY = "pilot-logbook-display-preferences-v1";
-const IMPORTED_LOCAL_IDS_KEY = "pilot-logbook-atelier-imported-local-ids-v1";
+const STORAGE_KEY_LEGACY = "pilot-logbook-atelier-v1";
+const SUM_SELECTION_KEY_LEGACY = "pilot-logbook-atelier-sum-selection-v1";
+const DISPLAY_PREFERENCES_KEY_LEGACY = "pilot-logbook-display-preferences-v1";
+const IMPORTED_LOCAL_IDS_KEY_LEGACY = "pilot-logbook-atelier-imported-local-ids-v1";
+const ACTIVE_FORMAT_KEY = "pilot-logbook-active-format-v1";
 const SPLIT_FIELD_PREFIX = "split__";
 const PRINT_PAGE_ENTRY_LIMIT = 18;
 const PRINT_PAGE_MIN_BLANK_ROWS = 6;
 const HISTORY_LIMIT = 50;
-const REQUIRED_FIELDS = ["date", "type", "registration", "pilotInCommand"];
-const ALL_LEDGER_COLUMN_INDICES = Array.from({ length: 32 }, (_, index) => index + 1);
-const HEADER_SPAN_MAP = {
-  group: [[1], [2], [3], [4], [5], [6], [7, 8, 9], [10, 11, 12], [13], [14, 15, 16, 17, 18, 19, 20, 21], [22, 23, 24, 25, 26, 27, 28, 29], [30, 31], [32]],
-  subgroup: [[7], [8], [9], [10], [11], [12], [13], [14, 15, 16, 17], [18, 19, 20, 21], [22, 23, 24, 25], [26, 27, 28, 29], [30], [31]],
-  micro: [[14], [15], [16], [17], [18], [19], [20], [21], [22], [23], [24], [25], [26], [27], [28], [29]],
-};
-
-const TIME_FIELDS = [
-  "seDayDual",
-  "seDayPic",
-  "seDayPicus",
-  "seDayCopilot",
-  "seNightDual",
-  "seNightPic",
-  "seNightPicus",
-  "seNightCopilot",
-  "meDayDual",
-  "meDayPic",
-  "meDayPicus",
-  "meDayCopilot",
-  "meNightDual",
-  "meNightPic",
-  "meNightPicus",
-  "meNightCopilot",
-];
-
-const DECIMAL_FIELDS = [
-  "instrumentActual",
-  "instrumentFstd",
-  "instructorSE",
-  "instructorME",
-  "fstdPrimary",
-  "fstdSecondary",
-  ...TIME_FIELDS,
-];
-
-const INTEGER_FIELDS = ["landingsDay", "landingsNight"];
-const SUMMABLE_FIELDS = [
-  "instrumentActual",
-  "instrumentFstd",
-  "instructorSE",
-  "instructorME",
-  "fstdPrimary",
-  "fstdSecondary",
-  ...TIME_FIELDS,
-  ...INTEGER_FIELDS,
-];
-
-const ENTRY_FIELDS = [
-  "date",
-  "type",
-  "registration",
-  "pilotInCommand",
-  "flightDetails",
-  "navaids",
-  "instrumentPlace",
-  "instrumentActual",
-  "instrumentFstd",
-  "instructorSE",
-  "instructorME",
-  "fstdPrimary",
-  "fstdSecondary",
-  ...TIME_FIELDS,
-  "landingsDay",
-  "landingsNight",
-  "remarks",
-];
-
-const LEDGER_FIELDS = [
-  "date",
-  "type",
-  "registration",
-  "pilotInCommand",
-  "flightDetails",
-  "navaids",
-  "instrumentPlace",
-  "instrumentActual",
-  "instrumentFstd",
-  "instructorSE",
-  "instructorME",
-  "fstdPrimary",
-  "fstdSecondary",
-  ...TIME_FIELDS,
-  "landingsDay",
-  "landingsNight",
-  "remarks",
-];
-
-const DEFAULT_ENTRY = Object.freeze(
-  ENTRY_FIELDS.reduce((entry, field) => {
-    entry[field] = "";
-    return entry;
-  }, {})
-);
-
-const initialLocalEntries = loadEntries();
+const FORMAT_OPTIONS = getFormatOptions();
+const initialFormat = loadActiveFormatKey();
+const initialLocalEntries = loadEntries(initialFormat);
 
 const state = {
+  activeFormat: initialFormat,
   entries: initialLocalEntries,
   localEntries: initialLocalEntries,
-  selectedSumIds: new Set(loadSelectedSumIds(initialLocalEntries)),
+  selectedSumIds: new Set(loadSelectedSumIds(initialLocalEntries, initialFormat)),
   selectedDeleteIds: new Set(),
-  importedLocalIds: new Set(loadImportedLocalIds(initialLocalEntries)),
+  importedLocalIds: new Set(loadImportedLocalIds(initialLocalEntries, initialFormat)),
   lastBulkSelectionId: null,
   lastSumSelectionId: null,
   editingId: null,
   splitSourceId: null,
   ledgerInteractionMode: "edit",
-  hideZeroValues: loadDisplayPreferences().hideZeroValues,
-  hideEmptyColumns: loadDisplayPreferences().hideEmptyColumns,
+  hideZeroValues: loadDisplayPreferences(initialFormat).hideZeroValues,
+  hideEmptyColumns: loadDisplayPreferences(initialFormat).hideEmptyColumns,
   dragId: null,
   dragPosition: null,
   user: null,
@@ -153,25 +66,23 @@ const resetFormButton = document.querySelector("#reset-form");
 const printButton = document.querySelector("#print-ledger");
 const formTitle = document.querySelector("#form-title");
 const formStatus = document.querySelector("#form-status");
+const formatFormSections = document.querySelector("#format-form-sections");
 const splitPanel = document.querySelector("#split-panel");
 const splitFormFields = document.querySelector("#split-form-fields");
-const ledgerBody = document.querySelector("#ledger-body");
-const ledgerFooter = document.querySelector("#ledger-footer");
 const ledgerTable = document.querySelector("#logbook-table");
 const ledgerScroller = document.querySelector(".ledger-stage .table-scroller");
 const printLedgerPages = document.querySelector("#print-ledger-pages");
+const paperFormatLabel = document.querySelector("#paper-format-label");
+const paperFormatTitle = document.querySelector("#paper-format-title");
+const paperFormatSubtitle = document.querySelector("#paper-format-subtitle");
 const entryList = document.querySelector("#entry-list");
 const emptyState = document.querySelector("#empty-state");
 const entryCount = document.querySelector("#entry-count");
 const flightHours = document.querySelector("#flight-hours");
 const landingCount = document.querySelector("#landing-count");
 const storageModeValue = document.querySelector("#storage-mode");
-const summaryIfActual = document.querySelector("#summary-if-actual");
-const summaryFstd = document.querySelector("#summary-fstd");
-const summarySeDual = document.querySelector("#summary-se-dual");
-const summaryPicDay = document.querySelector("#summary-pic-day");
-const summaryPicNight = document.querySelector("#summary-pic-night");
-const summaryMeDual = document.querySelector("#summary-me-dual");
+const summaryLabels = Array.from({ length: 6 }, (_, index) => document.querySelector(`#summary-label-${index + 1}`));
+const summaryValues = Array.from({ length: 6 }, (_, index) => document.querySelector(`#summary-value-${index + 1}`));
 const sumStatus = document.querySelector("#sum-status");
 const sumConsole = document.querySelector(".sum-console");
 const bulkStatus = document.querySelector("#bulk-status");
@@ -202,13 +113,68 @@ const syncCloudCount = document.querySelector("#sync-cloud-count");
 const syncPendingCount = document.querySelector("#sync-pending-count");
 const syncSummary = document.querySelector("#sync-summary");
 const syncFeedback = document.querySelector("#sync-feedback");
-const ledgerColgroupMarkup = ledgerTable.querySelector("colgroup").outerHTML;
-const ledgerHeadMarkup = ledgerTable.querySelector("thead").outerHTML;
+const formatToggle = document.querySelector("#format-toggle");
+const formatSwitcherStatus = document.querySelector("#format-switcher-status");
+let ledgerColgroup = document.querySelector("#ledger-colgroup");
+let ledgerHead = document.querySelector("#ledger-head");
+let ledgerBody = document.querySelector("#ledger-body");
+let ledgerFooter = document.querySelector("#ledger-footer");
 
 boot();
 
-async function boot() {
+function getActiveFormatConfig() {
+  return getFormatConfig(state.activeFormat);
+}
+
+function getStorageKeyForFormat(formatKey, suffix) {
+  return `pilot-logbook-atelier-${formatKey}-${suffix}-v2`;
+}
+
+function getStorageKey(formatKey = state.activeFormat) {
+  return getStorageKeyForFormat(formatKey, "entries");
+}
+
+function getSumSelectionKey(formatKey = state.activeFormat) {
+  return getStorageKeyForFormat(formatKey, "sum-selection");
+}
+
+function getDisplayPreferencesKey(formatKey = state.activeFormat) {
+  return getStorageKeyForFormat(formatKey, "display-preferences");
+}
+
+function getImportedLocalIdsKey(formatKey = state.activeFormat) {
+  return getStorageKeyForFormat(formatKey, "imported-local-ids");
+}
+
+function mountActiveFormatUi() {
+  const config = getActiveFormatConfig();
+
+  formatFormSections.innerHTML = config.formMarkup;
   buildSplitEditor();
+
+  ledgerTable.innerHTML = `
+    ${config.structure.colgroupMarkup}
+    ${config.structure.headMarkup}
+    <tbody id="ledger-body"></tbody>
+    <tfoot id="ledger-footer"></tfoot>
+  `;
+
+  ledgerColgroup = ledgerTable.querySelector("colgroup");
+  ledgerHead = ledgerTable.querySelector("thead");
+  ledgerBody = ledgerTable.querySelector("#ledger-body");
+  ledgerFooter = ledgerTable.querySelector("#ledger-footer");
+
+  paperFormatLabel.textContent = config.printLabel;
+  paperFormatTitle.textContent = config.printTitle;
+  paperFormatSubtitle.textContent = config.regionNote;
+  formatSwitcherStatus.textContent = `${config.label} is active right now.`;
+  formatToggle.querySelectorAll("[data-format-key]").forEach((button) => {
+    button.classList.toggle("is-selected", button.dataset.formatKey === state.activeFormat);
+  });
+}
+
+async function boot() {
+  mountActiveFormatUi();
   bindEvents();
   seedDefaultDate();
   render();
@@ -228,6 +194,7 @@ function bindEvents() {
   exportDataButton.addEventListener("click", handleExportData);
   importFileButton.addEventListener("click", () => importFileInput.click());
   importFileInput.addEventListener("change", handleImportFileSelection);
+  formatToggle.addEventListener("click", handleFormatSelection);
   undoButton.addEventListener("click", () => undoHistory());
   redoButton.addEventListener("click", () => redoHistory());
 
@@ -247,7 +214,7 @@ function bindEvents() {
   document.addEventListener("keydown", handleHistoryShortcut);
   window.addEventListener("resize", syncStickyLedgerHeaderOffsets);
 
-  ledgerBody.addEventListener("click", (event) => {
+  ledgerTable.addEventListener("click", (event) => {
     const row = event.target.closest(".filled-row[data-entry-id]");
     if (!row) {
       return;
@@ -294,6 +261,66 @@ async function handleAuthStateChange(user) {
     state.syncFeedback = "Cloud data could not be loaded right now. Your guest entries are still safe on this device.";
     state.storageMode = "guest";
     applyEntries(state.localEntries);
+  } finally {
+    state.isBusy = false;
+    render();
+  }
+}
+
+async function handleFormatSelection(event) {
+  const button = event.target.closest("[data-format-key]");
+  if (!button || state.isBusy) {
+    return;
+  }
+
+  const nextFormat = button.dataset.formatKey;
+  if (!nextFormat || nextFormat === state.activeFormat) {
+    return;
+  }
+
+  await switchActiveFormat(nextFormat);
+}
+
+async function switchActiveFormat(nextFormat) {
+  if (!getFormatConfig(nextFormat)) {
+    return;
+  }
+
+  state.isBusy = true;
+  state.syncFeedback = "";
+  render();
+
+  try {
+    state.activeFormat = nextFormat;
+    persistActiveFormatKey(nextFormat);
+    mountActiveFormatUi();
+
+    const localEntries = loadEntries(nextFormat).map((entry, index) => normalizeStoredEntry(entry, index));
+    state.localEntries = localEntries;
+    state.importedLocalIds = new Set(loadImportedLocalIds(localEntries, nextFormat));
+    state.selectedDeleteIds = new Set();
+    state.selectedSumIds = new Set(loadSelectedSumIds(localEntries, nextFormat));
+    const displayPreferences = loadDisplayPreferences();
+    state.hideZeroValues = displayPreferences.hideZeroValues;
+    state.hideEmptyColumns = displayPreferences.hideEmptyColumns;
+    state.lastBulkSelectionId = null;
+    state.lastSumSelectionId = null;
+    clearSessionHistory();
+
+    if (isCloudMode()) {
+      const cloudEntries = await loadCloudEntriesForCurrentUser();
+      syncImportedLocalIdsWithCloud(cloudEntries);
+      applyEntries(cloudEntries);
+      state.syncFeedback = `Switched to the ${getActiveFormatConfig().label} logbook.`;
+    } else {
+      applyEntries(localEntries);
+      state.syncFeedback = `Switched to the ${getActiveFormatConfig().label} logbook.`;
+    }
+
+    resetEditorState({ preserveMessage: false });
+  } catch (error) {
+    console.error(error);
+    state.syncFeedback = "The requested logbook format could not be loaded right now.";
   } finally {
     state.isBusy = false;
     render();
@@ -378,7 +405,7 @@ async function handleImportLocalToCloud() {
   render();
 
   try {
-    await upsertUserEntries(state.user.uid, importedEntries.map(serializeEntryForCloud));
+    await upsertUserEntries(state.user.uid, state.activeFormat, importedEntries.map(serializeEntryForCloud));
     markLocalEntriesAsImported(state.localEntries);
     applyEntries([...state.entries, ...importedEntries]);
     recordHistoryEntry(
@@ -405,6 +432,8 @@ function handleExportData() {
   const payload = {
     version: 1,
     exportedAt: new Date().toISOString(),
+    formatKey: state.activeFormat,
+    formatLabel: getActiveFormatConfig().label,
     mode: isCloudMode() ? "cloud" : "guest",
     entries: state.entries.map(serializeEntryForCloud),
     selectedSumIds: state.entries
@@ -442,6 +471,16 @@ async function handleImportFileSelection(event) {
   try {
     const raw = await file.text();
     const parsed = JSON.parse(raw);
+    const payloadFormat = getFormatConfig(parsed?.formatKey)?.key || state.activeFormat;
+    if (payloadFormat !== state.activeFormat) {
+      const accepted = window.confirm(
+        `This backup belongs to the ${getFormatConfig(payloadFormat).label} format. Switch to that format and continue importing?`
+      );
+      if (!accepted) {
+        return;
+      }
+      await switchActiveFormat(payloadFormat);
+    }
     const importedEntries = parseImportedEntries(parsed);
     importedEntriesForRollback = importedEntries;
     if (!importedEntries.length && parsed?.entries && Array.isArray(parsed.entries) && parsed.entries.length) {
@@ -502,12 +541,13 @@ function isCloudMode() {
 
 function getDefaultFormStatus() {
   return isCloudMode()
-    ? "Signed in. Entries sync to your private cloud logbook."
-    : "Guest mode: new entries are saved to this browser automatically.";
+    ? `Signed in. ${getActiveFormatConfig().label} entries sync to your private cloud logbook.`
+    : `Guest mode: new ${getActiveFormatConfig().label} entries are saved to this browser automatically.`;
 }
 
 function createHistorySnapshot() {
   return {
+    activeFormat: state.activeFormat,
     entries: cloneEntryCollection(state.entries),
     localEntries: cloneEntryCollection(state.localEntries),
     selectedSumIds: [...state.selectedSumIds],
@@ -561,6 +601,11 @@ function normalizeEntryCollection(entries) {
 }
 
 function applySessionSnapshot(snapshot, options = {}) {
+  if (snapshot.activeFormat && snapshot.activeFormat !== state.activeFormat) {
+    state.activeFormat = snapshot.activeFormat;
+    persistActiveFormatKey(state.activeFormat);
+    mountActiveFormatUi();
+  }
   const nextEntries = normalizeEntryCollection(snapshot.entries || []);
   const nextLocalEntries = normalizeEntryCollection(snapshot.localEntries || []);
   const entryIds = new Set(nextEntries.map((entry) => entry.id));
@@ -606,11 +651,11 @@ async function syncCloudEntriesToSnapshot(previousEntries, nextEntries) {
   );
 
   if (idsToDelete.length) {
-    await deleteUserEntries(state.user.uid, idsToDelete);
+    await deleteUserEntries(state.user.uid, state.activeFormat, idsToDelete);
   }
 
   if (entriesToUpsert.length) {
-    await upsertUserEntries(state.user.uid, entriesToUpsert.map(serializeEntryForCloud));
+    await upsertUserEntries(state.user.uid, state.activeFormat, entriesToUpsert.map(serializeEntryForCloud));
   }
 }
 
@@ -758,8 +803,9 @@ function applyEntries(entries) {
 }
 
 function normalizeStoredEntry(entry, fallbackIndex = 0) {
+  const config = getActiveFormatConfig();
   return {
-    ...DEFAULT_ENTRY,
+    ...config.defaultEntry,
     ...entry,
     id: entry.id || createId(),
     createdAt: entry.createdAt || new Date().toISOString(),
@@ -777,17 +823,19 @@ async function loadCloudEntriesForCurrentUser() {
     return [];
   }
 
-  const entries = await loadUserEntries(state.user.uid);
+  const entries = await loadUserEntries(state.user.uid, state.activeFormat);
   return entries.map((entry, index) => normalizeStoredEntry(entry, index));
 }
 
 function serializeEntryForCloud(entry) {
+  const config = getActiveFormatConfig();
   return {
     id: entry.id,
     createdAt: entry.createdAt || new Date().toISOString(),
     updatedAt: entry.updatedAt || new Date().toISOString(),
     sortOrder: getEntrySortOrder(entry),
-    ...ENTRY_FIELDS.reduce((record, field) => {
+    format: state.activeFormat,
+    ...config.entryFields.reduce((record, field) => {
       record[field] = entry[field] ?? "";
       return record;
     }, {}),
@@ -795,7 +843,7 @@ function serializeEntryForCloud(entry) {
 }
 
 function persistLocalEntries() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state.localEntries));
+  localStorage.setItem(getStorageKey(), JSON.stringify(state.localEntries));
 }
 
 function setLocalEntries(entries, options = {}) {
@@ -812,7 +860,9 @@ function setLocalEntries(entries, options = {}) {
 }
 
 function buildEntryFingerprint(entry) {
-  return ENTRY_FIELDS.map((field) => String(entry[field] ?? "").trim()).join("||");
+  return getActiveFormatConfig()
+    .entryFields.map((field) => String(entry[field] ?? "").trim())
+    .join("||");
 }
 
 function getPendingLocalImports() {
@@ -952,7 +1002,7 @@ async function persistCloudEntries(entries) {
     return;
   }
 
-  await upsertUserEntries(state.user.uid, entries.map(serializeEntryForCloud));
+  await upsertUserEntries(state.user.uid, state.activeFormat, entries.map(serializeEntryForCloud));
 }
 
 async function handleSaveEntry(event) {
@@ -964,7 +1014,7 @@ async function handleSaveEntry(event) {
 
   const entry = readFormEntry();
   if (!isEntryValid(entry)) {
-    formStatus.textContent = "Complete Date, Type, Registration, and Pilot in command before saving.";
+    formStatus.textContent = `Complete the required ${getActiveFormatConfig().label} fields before saving.`;
     return;
   }
 
@@ -974,8 +1024,7 @@ async function handleSaveEntry(event) {
   if (state.splitSourceId) {
     const splitEntry = readFormEntry(SPLIT_FIELD_PREFIX);
     if (!isEntryValid(splitEntry)) {
-      formStatus.textContent =
-        "Complete Date, Type, Registration, and Pilot in command in both split entries.";
+      formStatus.textContent = `Complete the required ${getActiveFormatConfig().label} fields in both split entries.`;
       return;
     }
 
@@ -1047,8 +1096,9 @@ async function handleSaveEntry(event) {
 
 function readFormEntry(prefix = "") {
   const formData = new FormData(form);
+  const config = getActiveFormatConfig();
 
-  return ENTRY_FIELDS.reduce((entry, field) => {
+  return config.entryFields.reduce((entry, field) => {
     const rawValue = String(formData.get(`${prefix}${field}`) ?? "").trim();
     entry[field] = normalizeField(field, rawValue);
     return entry;
@@ -1056,16 +1106,17 @@ function readFormEntry(prefix = "") {
 }
 
 function normalizeField(field, rawValue) {
+  const config = getActiveFormatConfig();
   if (!rawValue) {
     return "";
   }
 
-  if (INTEGER_FIELDS.includes(field)) {
+  if (config.integerFields.includes(field)) {
     const numericValue = Math.max(0, Math.round(Number(rawValue)));
     return Number.isFinite(numericValue) ? String(numericValue) : "";
   }
 
-  if (DECIMAL_FIELDS.includes(field)) {
+  if (config.decimalFields.includes(field)) {
     const numericValue = Math.max(0, Number(rawValue));
     return Number.isFinite(numericValue) ? trimZeroes(numericValue.toFixed(1)) : "";
   }
@@ -1108,7 +1159,7 @@ function editEntry(entryId) {
   }
 
   state.editingId = entry.id;
-  ENTRY_FIELDS.forEach((field) => {
+  getActiveFormatConfig().entryFields.forEach((field) => {
     const input = form.elements[field];
     if (!input) {
       return;
@@ -1224,7 +1275,7 @@ async function deleteEntry(entryId) {
     }
 
     if (isCloudMode()) {
-      await deleteUserEntry(state.user.uid, entryId);
+      await deleteUserEntry(state.user.uid, state.activeFormat, entryId);
     } else {
       setLocalEntries(state.entries);
     }
@@ -1527,7 +1578,7 @@ async function deleteSelectedEntries() {
     }
 
     if (isCloudMode()) {
-      await deleteUserEntries(state.user.uid, [...selectedIds]);
+      await deleteUserEntries(state.user.uid, state.activeFormat, [...selectedIds]);
     } else {
       setLocalEntries(state.entries);
     }
@@ -1570,7 +1621,7 @@ async function deleteAllEntries() {
     state.lastSumSelectionId = null;
 
     if (isCloudMode()) {
-      await deleteUserEntries(state.user.uid, entryIds);
+      await deleteUserEntries(state.user.uid, state.activeFormat, entryIds);
     } else {
       setLocalEntries([]);
     }
@@ -1694,33 +1745,28 @@ function renderSummary() {
   );
   const totals = state.entries.reduce(
     (summary, entry) => {
-      summary.ifActual += toNumber(entry.instrumentActual);
-      summary.fstd += toNumber(entry.instrumentFstd);
-      summary.seDual += toNumber(entry.seDayDual) + toNumber(entry.seNightDual);
-      summary.picDay += toNumber(entry.seDayPic) + toNumber(entry.meDayPic);
-      summary.picNight += toNumber(entry.seNightPic) + toNumber(entry.meNightPic);
-      summary.meDual += toNumber(entry.meDayDual) + toNumber(entry.meNightDual);
+      getActiveFormatConfig().summaryMetrics.forEach((metric, index) => {
+        summary[index] += metric.fields.reduce((sum, field) => sum + toNumber(entry[field]), 0);
+      });
       return summary;
     },
-    {
-      ifActual: 0,
-      fstd: 0,
-      seDual: 0,
-      picDay: 0,
-      picNight: 0,
-      meDual: 0,
-    }
+    Object.fromEntries(getActiveFormatConfig().summaryMetrics.map((_, index) => [index, 0]))
   );
+  const summaryTotals = getActiveFormatConfig().summaryTotals(state.entries, { toNumber, formatTotal });
 
   entryCount.textContent = String(state.entries.length);
-  flightHours.textContent = formatTotal(totalHours);
-  landingCount.textContent = String(totalLandings);
-  summaryIfActual.textContent = formatTotal(totals.ifActual);
-  summaryFstd.textContent = formatTotal(totals.fstd);
-  summarySeDual.textContent = formatTotal(totals.seDual);
-  summaryPicDay.textContent = formatTotal(totals.picDay);
-  summaryPicNight.textContent = formatTotal(totals.picNight);
-  summaryMeDual.textContent = formatTotal(totals.meDual);
+  flightHours.textContent = formatTotal(summaryTotals.flightHours ?? totalHours);
+  landingCount.textContent = String(summaryTotals.landingCount ?? totalLandings);
+  getActiveFormatConfig().summaryMetrics.forEach((metric, index) => {
+    if (summaryLabels[index]) {
+      summaryLabels[index].textContent = metric.label;
+    }
+    if (summaryValues[index]) {
+      summaryValues[index].textContent = metric.integer
+        ? String(Math.round(totals[index] || 0))
+        : formatTotal(totals[index] || 0);
+    }
+  });
 }
 
 function createSyncInitials(source, fallback = "GU") {
@@ -1815,6 +1861,7 @@ function renderSyncConsole() {
   syncAvatar.classList.toggle("sync-avatar--guest", !isSignedIn);
   authStatus.textContent = accountName;
   syncMessage.textContent = accountMeta;
+  formatSwitcherStatus.textContent = `${getActiveFormatConfig().label} is active right now.`;
   syncCloudCount.textContent = String(cloudEntryCount);
   syncPendingCount.textContent = String(pendingEntryCount);
   syncCloudStat.classList.toggle("is-empty", cloudEntryCount === 0);
@@ -1938,6 +1985,7 @@ function renderDisplayPreferences() {
 }
 
 function createEntryCard(entry, index) {
+  const config = getActiveFormatConfig();
   const isActive = entry.id === state.editingId;
   const isSelectedForSum = state.selectedSumIds.has(entry.id);
   const isSelectedForDelete = state.selectedDeleteIds.has(entry.id);
@@ -1946,8 +1994,8 @@ function createEntryCard(entry, index) {
     <li class="entry-card ${isActive ? "is-active" : ""} ${isSelectedForSum ? "is-in-sum" : ""} ${isSelectedForDelete ? "is-bulk-selected" : ""}" data-entry-id="${entry.id}" draggable="true">
       <div class="entry-card__top">
         <div>
-          <p class="entry-card__title">${escapeHtml(formatLedgerDate(entry.date))} • ${escapeHtml(entry.type)}</p>
-          <p class="entry-card__subtitle">${escapeHtml(entry.registration)} • ${escapeHtml(entry.pilotInCommand)}</p>
+          <p class="entry-card__title">${escapeHtml(config.cardTitle(entry, { formatLedgerDate }))}</p>
+          <p class="entry-card__subtitle">${escapeHtml(config.cardSubtitle(entry))}</p>
         </div>
         <div class="entry-card__controls">
           <label class="entry-select" aria-label="Select entry for bulk delete">
@@ -1958,9 +2006,11 @@ function createEntryCard(entry, index) {
         </div>
       </div>
       <div class="entry-card__meta">
-        <span class="chip">${escapeHtml(sumTimeColumns(entry, true))} hrs</span>
-        <span class="chip">${escapeHtml(entry.landingsDay || "0")} day landings</span>
-        <span class="chip">${escapeHtml(entry.landingsNight || "0")} night landings</span>
+        <span class="chip">${escapeHtml(config.hoursValue(entry, { formatTotal, toNumber }))} hrs</span>
+        ${config
+          .landingsMeta(entry)
+          .map((label) => `<span class="chip">${escapeHtml(label)}</span>`)
+          .join("")}
         <span class="chip ${isSelectedForSum ? "is-selected" : "is-deselected"}">
           ${isSelectedForSum ? "Included in manual sum" : "Excluded from manual sum"}
         </span>
@@ -2005,12 +2055,13 @@ function renderPrintLedgerPages() {
 }
 
 function createLedgerRow(entry) {
-  const cells = LEDGER_FIELDS.map((field, index) => {
+  const config = getActiveFormatConfig();
+  const cells = config.ledgerFields.map((field, index) => {
     const value = formatLedgerCell(field, entry[field]);
     const classes = [
       isCenteredField(field) ? "cell-center" : "",
       field === "remarks" && !value ? "cell-note" : "",
-      field === "flightDetails" || field === "remarks" ? "cell-wrap" : "",
+      config.wrapFields.has(field) ? "cell-wrap" : "",
     ]
       .filter(Boolean)
       .join(" ");
@@ -2026,14 +2077,16 @@ function createLedgerRow(entry) {
 }
 
 function createBlankRow() {
+  const columnCount = getActiveFormatConfig().ledgerFields.length;
   return `
     <tr class="blank-row" aria-hidden="true">
-      ${Array.from({ length: LEDGER_FIELDS.length }, (_, index) => `<td data-column-index="${index + 1}">&nbsp;</td>`).join("")}
+      ${Array.from({ length: columnCount }, (_, index) => `<td data-column-index="${index + 1}">&nbsp;</td>`).join("")}
     </tr>
   `;
 }
 
 function createPrintLedgerPage(entries, pageIndex, totalPages) {
+  const config = getActiveFormatConfig();
   const rows = entries.map((entry) => createLedgerRow(entry)).join("");
   const blankCount = Math.max(PRINT_PAGE_ENTRY_LIMIT - entries.length, PRINT_PAGE_MIN_BLANK_ROWS);
   const blanks = Array.from({ length: blankCount }, () => createBlankRow()).join("");
@@ -2045,8 +2098,8 @@ function createPrintLedgerPage(entries, pageIndex, totalPages) {
         <div class="paper-sheet">
           <div class="paper-title">
             <div>
-              <p class="paper-label">Pilot Logbook</p>
-              <h3>Flight entries ledger</h3>
+              <p class="paper-label">${escapeHtml(config.printLabel)}</p>
+              <h3>${escapeHtml(config.printTitle)}</h3>
             </div>
             <div class="paper-meta">
               <p class="paper-credit">${escapeHtml(pageLabel)}</p>
@@ -2055,8 +2108,8 @@ function createPrintLedgerPage(entries, pageIndex, totalPages) {
           </div>
           <div class="table-scroller">
             <table class="logbook-table">
-              ${ledgerColgroupMarkup}
-              ${ledgerHeadMarkup}
+              ${config.structure.colgroupMarkup}
+              ${config.structure.headMarkup}
               <tbody>${rows + blanks}</tbody>
               ${pageIndex === totalPages - 1 ? `<tfoot>${createFooter()}</tfoot>` : ""}
             </table>
@@ -2068,6 +2121,7 @@ function createPrintLedgerPage(entries, pageIndex, totalPages) {
 }
 
 function createFooter() {
+  const config = getActiveFormatConfig();
   const selectedEntries = getSelectedEntries();
 
   return `
@@ -2092,22 +2146,28 @@ function createFooter() {
 }
 
 function createSumFooterRow({ label, entries, note, isManual = false }) {
+  const config = getActiveFormatConfig();
   const hasAnyRows = state.entries.length > 0;
-  const totals = SUMMABLE_FIELDS.map((field) =>
-    formatFooterNumber(
-      entries.reduce((sum, entry) => sum + toNumber(entry[field]), 0),
-      INTEGER_FIELDS.includes(field),
-      hasAnyRows
-    )
-  );
+  const trailingCells = config.ledgerFields
+    .slice(config.footerLeadColumns, -1)
+    .map((field, offset) => {
+      const columnIndex = config.footerLeadColumns + offset + 1;
+      const value = config.summableFields.includes(field)
+        ? formatFooterNumber(
+            entries.reduce((sum, entry) => sum + toNumber(entry[field]), 0),
+            config.integerFields.includes(field),
+            hasAnyRows
+          )
+        : "";
+      return `<td class="cell-center" data-column-index="${columnIndex}">${value}</td>`;
+    })
+    .join("");
 
   return `
-    <tr>
-      <th colspan="7" class="footer-label" data-footer-label="true">${escapeHtml(label)}</th>
-      ${totals
-        .map((value, index) => `<td class="cell-center" data-column-index="${index + 8}">${value}</td>`)
-        .join("")}
-      <td class="footer-note" data-column-index="32">${escapeHtml(note)}</td>
+    <tr class="${isManual ? "footer-row-manual" : "footer-row-automatic"}">
+      <th colspan="${config.footerLeadColumns}" class="footer-label" data-footer-label="true">${escapeHtml(label)}</th>
+      ${trailingCells}
+      <td class="footer-note" data-column-index="${config.ledgerFields.length}">${escapeHtml(note)}</td>
     </tr>
   `;
 }
@@ -2161,24 +2221,26 @@ function applyLedgerColumnVisibility() {
 }
 
 function getVisibleLedgerColumns() {
+  const config = getActiveFormatConfig();
+  const allColumns = Array.from({ length: config.ledgerFields.length }, (_, index) => index + 1);
   if (!state.hideEmptyColumns || !state.entries.length) {
-    return new Set(ALL_LEDGER_COLUMN_INDICES);
+    return new Set(allColumns);
   }
 
   const visibleColumns = new Set();
 
-  LEDGER_FIELDS.forEach((field, index) => {
+  config.ledgerFields.forEach((field, index) => {
     const hasVisibleValue = state.entries.some((entry) => hasVisibleLedgerValue(field, entry[field]));
     if (hasVisibleValue) {
       visibleColumns.add(index + 1);
     }
   });
 
-  return visibleColumns.size ? visibleColumns : new Set(ALL_LEDGER_COLUMN_INDICES);
+  return visibleColumns.size ? visibleColumns : new Set(allColumns);
 }
 
 function hasVisibleLedgerValue(field, value) {
-  if (SUMMABLE_FIELDS.includes(field)) {
+  if (getActiveFormatConfig().summableFields.includes(field)) {
     return toNumber(value) !== 0;
   }
 
@@ -2200,7 +2262,7 @@ function applyMergedHeaderVisibility(rowKey, visibleColumns) {
   }
 
   [...row.children].forEach((cell, index) => {
-    const coveredColumns = HEADER_SPAN_MAP[rowKey][index];
+    const coveredColumns = getActiveFormatConfig().headerSpanMap[rowKey][index];
     const visibleCount = coveredColumns.filter((columnIndex) => visibleColumns.has(columnIndex)).length;
 
     cell.classList.toggle("is-column-hidden", visibleCount === 0);
@@ -2216,7 +2278,9 @@ function applyMergedHeaderVisibility(rowKey, visibleColumns) {
 }
 
 function applyFooterVisibility(visibleColumns) {
-  const leadingVisibleColumns = ALL_LEDGER_COLUMN_INDICES.filter((index) => index <= 7 && visibleColumns.has(index)).length;
+  const config = getActiveFormatConfig();
+  const allColumns = Array.from({ length: config.ledgerFields.length }, (_, index) => index + 1);
+  const leadingVisibleColumns = allColumns.filter((index) => index <= config.footerLeadColumns && visibleColumns.has(index)).length;
 
   ledgerFooter.querySelectorAll("[data-footer-label]").forEach((cell) => {
     cell.colSpan = Math.max(leadingVisibleColumns, 1);
@@ -2233,7 +2297,7 @@ function formatLedgerCell(field, value) {
     return "";
   }
 
-  if (state.hideZeroValues && SUMMABLE_FIELDS.includes(field) && toNumber(value) === 0) {
+  if (state.hideZeroValues && getActiveFormatConfig().summableFields.includes(field) && toNumber(value) === 0) {
     return "";
   }
 
@@ -2245,24 +2309,19 @@ function formatLedgerCell(field, value) {
 }
 
 function isCenteredField(field) {
-  return field !== "flightDetails" && field !== "remarks" && field !== "pilotInCommand";
+  return getActiveFormatConfig().centeredFields.has(field);
 }
 
 function sumTimeColumns(entry, asText = false) {
-  const total = TIME_FIELDS.reduce((sum, field) => sum + toNumber(entry[field]), 0);
+  const config = getActiveFormatConfig();
+  const total = config.key === "sacaa"
+    ? config.timeFields.reduce((sum, field) => sum + toNumber(entry[field]), 0)
+    : toNumber(entry.totalFlightTime);
   return asText ? formatTotal(total) : total;
 }
 
 function sumHeadlineFlightTime(entry) {
-  return (
-    toNumber(entry.seDayDual) +
-    toNumber(entry.seDayPic) +
-    toNumber(entry.seNightDual) +
-    toNumber(entry.seNightPic) +
-    toNumber(entry.meDayDual) +
-    toNumber(entry.meNightDual) +
-    toNumber(entry.meNightPic)
-  );
+  return getActiveFormatConfig().summaryTotals([entry], { toNumber, formatTotal }).flightHours;
 }
 
 function formatFooterNumber(value, integer = false, showZero = true) {
@@ -2286,9 +2345,12 @@ function toNumber(value) {
   return Number.isFinite(number) ? number : 0;
 }
 
-function loadEntries() {
+function loadEntries(formatKey = state.activeFormat) {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    let raw = localStorage.getItem(getStorageKey(formatKey));
+    if (!raw && formatKey === DEFAULT_FORMAT_KEY) {
+      raw = localStorage.getItem(STORAGE_KEY_LEGACY);
+    }
     if (!raw) {
       return [];
     }
@@ -2298,15 +2360,31 @@ function loadEntries() {
       return [];
     }
 
-    return parsed.map((entry) => ({ ...DEFAULT_ENTRY, ...entry }));
+    return parsed.map((entry) => ({ ...getFormatConfig(formatKey).defaultEntry, ...entry }));
   } catch (error) {
     return [];
   }
 }
 
-function loadSelectedSumIds(entries) {
+function loadActiveFormatKey() {
   try {
-    const raw = localStorage.getItem(SUM_SELECTION_KEY);
+    const raw = localStorage.getItem(ACTIVE_FORMAT_KEY);
+    return getFormatConfig(raw)?.key || DEFAULT_FORMAT_KEY;
+  } catch (error) {
+    return DEFAULT_FORMAT_KEY;
+  }
+}
+
+function persistActiveFormatKey(formatKey) {
+  localStorage.setItem(ACTIVE_FORMAT_KEY, formatKey);
+}
+
+function loadSelectedSumIds(entries, formatKey = state.activeFormat) {
+  try {
+    let raw = localStorage.getItem(getSumSelectionKey(formatKey));
+    if (raw === null && formatKey === DEFAULT_FORMAT_KEY) {
+      raw = localStorage.getItem(SUM_SELECTION_KEY_LEGACY);
+    }
     if (raw === null) {
       return entries.map((entry) => entry.id);
     }
@@ -2323,9 +2401,12 @@ function loadSelectedSumIds(entries) {
   }
 }
 
-function loadDisplayPreferences() {
+function loadDisplayPreferences(formatKey = state.activeFormat) {
   try {
-    const raw = localStorage.getItem(DISPLAY_PREFERENCES_KEY);
+    let raw = localStorage.getItem(getDisplayPreferencesKey(formatKey));
+    if (!raw && formatKey === DEFAULT_FORMAT_KEY) {
+      raw = localStorage.getItem(DISPLAY_PREFERENCES_KEY_LEGACY);
+    }
     if (!raw) {
       return { hideZeroValues: false, hideEmptyColumns: false };
     }
@@ -2345,12 +2426,12 @@ function persistSelectedSumIds() {
     .map((entry) => entry.id)
     .filter((entryId) => state.selectedSumIds.has(entryId));
 
-  localStorage.setItem(SUM_SELECTION_KEY, JSON.stringify(orderedSelection));
+  localStorage.setItem(getSumSelectionKey(), JSON.stringify(orderedSelection));
 }
 
 function persistDisplayPreferences() {
   localStorage.setItem(
-    DISPLAY_PREFERENCES_KEY,
+    getDisplayPreferencesKey(),
     JSON.stringify({
       hideZeroValues: state.hideZeroValues,
       hideEmptyColumns: state.hideEmptyColumns,
@@ -2358,9 +2439,12 @@ function persistDisplayPreferences() {
   );
 }
 
-function loadImportedLocalIds(entries) {
+function loadImportedLocalIds(entries, formatKey = state.activeFormat) {
   try {
-    const raw = localStorage.getItem(IMPORTED_LOCAL_IDS_KEY);
+    let raw = localStorage.getItem(getImportedLocalIdsKey(formatKey));
+    if (!raw && formatKey === DEFAULT_FORMAT_KEY) {
+      raw = localStorage.getItem(IMPORTED_LOCAL_IDS_KEY_LEGACY);
+    }
     if (!raw) {
       return [];
     }
@@ -2380,7 +2464,7 @@ function loadImportedLocalIds(entries) {
 function persistImportedLocalIds() {
   const validIds = new Set(state.localEntries.map((entry) => entry.id));
   const orderedImportedIds = [...state.importedLocalIds].filter((entryId) => validIds.has(entryId));
-  localStorage.setItem(IMPORTED_LOCAL_IDS_KEY, JSON.stringify(orderedImportedIds));
+  localStorage.setItem(getImportedLocalIdsKey(), JSON.stringify(orderedImportedIds));
 }
 
 function getSelectedEntries() {
@@ -2388,11 +2472,11 @@ function getSelectedEntries() {
 }
 
 function isEntryValid(entry) {
-  return REQUIRED_FIELDS.every((field) => entry[field]);
+  return getActiveFormatConfig().requiredFields.every((field) => entry[field]);
 }
 
 function fillSplitEditorFields(entry) {
-  ENTRY_FIELDS.forEach((field) => {
+  getActiveFormatConfig().entryFields.forEach((field) => {
     const input = form.elements[`${SPLIT_FIELD_PREFIX}${field}`];
     if (!input) {
       return;
@@ -2403,7 +2487,7 @@ function fillSplitEditorFields(entry) {
 }
 
 function clearSplitEditorFields() {
-  ENTRY_FIELDS.forEach((field) => {
+  getActiveFormatConfig().entryFields.forEach((field) => {
     const input = form.elements[`${SPLIT_FIELD_PREFIX}${field}`];
     if (!input) {
       return;
@@ -2560,7 +2644,7 @@ function formatLedgerDate(value) {
     return value;
   }
 
-  return `${day}/${month}/${year}`;
+  return state.activeFormat === "faa" ? `${month}/${day}/${year}` : `${day}/${month}/${year}`;
 }
 
 function formatDateInput(date) {
