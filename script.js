@@ -25,7 +25,7 @@ const PRINT_PAGE_MIN_BLANK_ROWS = 6;
 const HISTORY_LIMIT = 50;
 const FORMAT_OPTIONS = getFormatOptions();
 const initialFormat = loadActiveFormatKey();
-const initialLocalEntries = loadEntries(initialFormat);
+const initialLocalEntries = normalizeEntryCollection(loadEntries(initialFormat), initialFormat);
 
 const state = {
   activeFormat: initialFormat,
@@ -295,7 +295,7 @@ async function switchActiveFormat(nextFormat) {
     persistActiveFormatKey(nextFormat);
     mountActiveFormatUi();
 
-    const localEntries = loadEntries(nextFormat).map((entry, index) => normalizeStoredEntry(entry, index));
+    const localEntries = normalizeEntryCollection(loadEntries(nextFormat), nextFormat);
     state.localEntries = localEntries;
     state.importedLocalIds = new Set(loadImportedLocalIds(localEntries, nextFormat));
     state.selectedDeleteIds = new Set();
@@ -594,10 +594,10 @@ function recordHistoryEntry(label, beforeSnapshot) {
   renderHistoryConsole();
 }
 
-function normalizeEntryCollection(entries) {
+function normalizeEntryCollection(entries, formatKey = state.activeFormat) {
   return entries
-    .map((entry, index) => normalizeStoredEntry(entry, index))
-    .sort((firstEntry, secondEntry) => getEntrySortOrder(firstEntry) - getEntrySortOrder(secondEntry));
+    .map((entry, index) => normalizeStoredEntry(entry, index, formatKey))
+    .sort(compareEntriesByDateAndLoggedOrder);
 }
 
 function applySessionSnapshot(snapshot, options = {}) {
@@ -802,8 +802,8 @@ function applyEntries(entries) {
     : null;
 }
 
-function normalizeStoredEntry(entry, fallbackIndex = 0) {
-  const config = getActiveFormatConfig();
+function normalizeStoredEntry(entry, fallbackIndex = 0, formatKey = state.activeFormat) {
+  const config = getFormatConfig(formatKey);
   return {
     ...config.defaultEntry,
     ...entry,
@@ -812,6 +812,45 @@ function normalizeStoredEntry(entry, fallbackIndex = 0) {
     updatedAt: entry.updatedAt || new Date().toISOString(),
     sortOrder: Number.isFinite(Number(entry.sortOrder)) ? Number(entry.sortOrder) : (fallbackIndex + 1) * 1024,
   };
+}
+
+function getEntryDateSortKey(entry) {
+  const value = String(entry?.date || "").trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : "9999-12-31";
+}
+
+function getEntryCreatedAtSortValue(entry) {
+  const createdAt = Date.parse(String(entry?.createdAt || ""));
+  return Number.isFinite(createdAt) ? createdAt : null;
+}
+
+function compareEntriesByDateAndLoggedOrder(firstEntry, secondEntry) {
+  const dateComparison = getEntryDateSortKey(firstEntry).localeCompare(getEntryDateSortKey(secondEntry));
+  if (dateComparison !== 0) {
+    return dateComparison;
+  }
+
+  const firstCreatedAt = getEntryCreatedAtSortValue(firstEntry);
+  const secondCreatedAt = getEntryCreatedAtSortValue(secondEntry);
+
+  if (firstCreatedAt !== null || secondCreatedAt !== null) {
+    if (firstCreatedAt === null) {
+      return 1;
+    }
+    if (secondCreatedAt === null) {
+      return -1;
+    }
+    if (firstCreatedAt !== secondCreatedAt) {
+      return firstCreatedAt - secondCreatedAt;
+    }
+  }
+
+  const sortOrderComparison = getEntrySortOrder(firstEntry) - getEntrySortOrder(secondEntry);
+  if (sortOrderComparison !== 0) {
+    return sortOrderComparison;
+  }
+
+  return String(firstEntry.id || "").localeCompare(String(secondEntry.id || ""));
 }
 
 function getEntrySortOrder(entry) {
@@ -824,7 +863,7 @@ async function loadCloudEntriesForCurrentUser() {
   }
 
   const entries = await loadUserEntries(state.user.uid, state.activeFormat);
-  return entries.map((entry, index) => normalizeStoredEntry(entry, index));
+  return normalizeEntryCollection(entries);
 }
 
 function serializeEntryForCloud(entry) {
@@ -847,7 +886,7 @@ function persistLocalEntries() {
 }
 
 function setLocalEntries(entries, options = {}) {
-  state.localEntries = entries.map((entry, index) => normalizeStoredEntry(entry, index));
+  state.localEntries = normalizeEntryCollection(entries);
   if (options.resetImportedIds) {
     state.importedLocalIds = new Set();
   } else {
@@ -940,9 +979,7 @@ function buildImportedEntries(localEntries, cloudEntries) {
 function parseImportedEntries(payload) {
   const sourceEntries = Array.isArray(payload) ? payload : Array.isArray(payload?.entries) ? payload.entries : [];
 
-  return sourceEntries
-    .map((entry, index) => normalizeStoredEntry(entry, index))
-    .sort((firstEntry, secondEntry) => getEntrySortOrder(firstEntry) - getEntrySortOrder(secondEntry));
+  return normalizeEntryCollection(sourceEntries);
 }
 
 function parseImportedSelectedSumIds(payload, entries) {
@@ -1048,7 +1085,7 @@ async function handleSaveEntry(event) {
         updatedAt: new Date().toISOString(),
       });
 
-      state.entries = state.entries.map((item) => (item.id === entryIdToReveal ? updatedEntry : item));
+      applyEntries(state.entries.map((item) => (item.id === entryIdToReveal ? updatedEntry : item)));
 
       if (isCloudMode()) {
         await persistCloudEntries([updatedEntry]);
@@ -1060,11 +1097,11 @@ async function handleSaveEntry(event) {
         id: createId(),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        sortOrder: createTopSortOrder(state.entries),
+        sortOrder: createBottomSortOrder(state.entries),
         ...entry,
       });
 
-      state.entries = [newEntry, ...state.entries];
+      applyEntries([...state.entries, newEntry]);
       state.selectedSumIds.add(newEntry.id);
 
       if (isCloudMode()) {
@@ -1676,7 +1713,7 @@ async function saveSplitEntries(primaryEntry, secondaryEntry) {
 
   const reorderedEntries = [...state.entries];
   reorderedEntries.splice(sourceIndex, 1, firstEntry, secondEntry);
-  state.entries = reorderedEntries;
+  applyEntries(reorderedEntries);
 
   if (shouldCarrySum) {
     state.selectedSumIds.add(secondEntryId);
@@ -1892,10 +1929,10 @@ function renderSyncConsole() {
 function renderManifest() {
   emptyState.hidden = state.entries.length > 0;
   manifestStatus.textContent = isCloudMode()
-    ? "Cloud rows are private to the signed-in pilot account. Drag cards to reorder the synced ledger."
+    ? "Cloud rows are private to the signed-in pilot account. Entries are sorted by date automatically, and the first row logged on a matching date stays above."
     : state.user
-      ? "Cloud data is unavailable right now, so you are viewing the device copy."
-      : "Drag cards to reorder the printed ledger rows on this device.";
+      ? "Cloud data is unavailable right now, so you are viewing the device copy in date order. If two rows share a date, the one logged first stays above."
+      : "Entries are sorted by date automatically on this device. If two rows share a date, the one logged first stays above.";
   entryList.innerHTML = state.entries
     .map((entry, index) => createEntryCard(entry, index))
     .join("");
@@ -1999,7 +2036,7 @@ function createEntryCard(entry, index) {
   const isSelectedForDelete = state.selectedDeleteIds.has(entry.id);
 
   return `
-    <li class="entry-card ${isActive ? "is-active" : ""} ${isSelectedForSum ? "is-in-sum" : ""} ${isSelectedForDelete ? "is-bulk-selected" : ""}" data-entry-id="${entry.id}" draggable="true">
+    <li class="entry-card ${isActive ? "is-active" : ""} ${isSelectedForSum ? "is-in-sum" : ""} ${isSelectedForDelete ? "is-bulk-selected" : ""}" data-entry-id="${entry.id}">
       <div class="entry-card__top">
         <div>
           <p class="entry-card__title">${escapeHtml(config.cardTitle(entry, { formatLedgerDate }))}</p>
@@ -2010,7 +2047,6 @@ function createEntryCard(entry, index) {
             <input class="entry-select__checkbox" type="checkbox" data-bulk-select value="${entry.id}" ${isSelectedForDelete ? "checked" : ""} />
             <span>Select</span>
           </label>
-          <span class="entry-card__handle" aria-hidden="true">:::</span>
         </div>
       </div>
       <div class="entry-card__meta">
@@ -2031,8 +2067,6 @@ function createEntryCard(entry, index) {
         <button type="button" class="mini-button ${isSelectedForSum ? "is-selected" : ""}" data-action="toggle-sum">
           ${isSelectedForSum ? "Sum on" : "Use in sum"}
         </button>
-        <button type="button" class="mini-button" data-action="move-up">Move up</button>
-        <button type="button" class="mini-button" data-action="move-down">Move down</button>
         <button type="button" class="mini-button" data-action="delete">Delete</button>
       </div>
     </li>
