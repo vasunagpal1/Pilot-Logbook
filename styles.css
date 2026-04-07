@@ -149,6 +149,7 @@ body::before {
 
 .sync-badge {
   display: inline-flex;
+  max-width: 100%;
   align-items: center;
   gap: 8px;
   padding: 7px 15px;
@@ -905,6 +906,8 @@ body::before {
 }
 
 .button {
+  min-width: 0;
+  max-width: 100%;
   border: 1px solid transparent;
   border-radius: 999px;
   padding: 10px 14px;
@@ -1612,9 +1615,9 @@ body::before {
     grid-template-columns: 1fr;
   }
 
-  #format-form-sections > .form-section,
-  .split-panel__fields > .form-section {
-    grid-column: 1;
+  #format-form-sections > .form-section:nth-of-type(n),
+  .split-panel__fields > .form-section:nth-of-type(n) {
+    grid-column: 1 / -1;
   }
 }
 
@@ -1710,8 +1713,24 @@ body::before {
     width: 100%;
   }
 
+  .sync-panel__header {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .form-actions,
+  .sum-console__actions,
+  .bulk-console__actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
   .sync-account__actions .button,
-  .history-button {
+  .history-button,
+  .form-actions .button,
+  .sum-console__actions .mini-button,
+  .bulk-console__actions .mini-button {
     width: 100%;
   }
 
