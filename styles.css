@@ -1612,12 +1612,16 @@ body::before {
 
   #format-form-sections,
   .split-panel__fields {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
   }
 
   #format-form-sections > .form-section:nth-of-type(n),
   .split-panel__fields > .form-section:nth-of-type(n) {
-    grid-column: 1 / -1;
+    width: 100%;
+    max-width: 100%;
+    grid-column: auto;
   }
 }
 
