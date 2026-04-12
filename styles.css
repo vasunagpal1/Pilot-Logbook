@@ -1647,6 +1647,18 @@ body::before {
     padding-right: 0;
   }
 
+  .panel-manifest {
+    max-height: min(78vh, 820px);
+  }
+
+  .panel-scroll--manifest {
+    overflow-y: auto;
+    max-height: min(68vh, 720px);
+    padding-right: 4px;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
   .hero-copy h1 {
     max-width: none;
   }
