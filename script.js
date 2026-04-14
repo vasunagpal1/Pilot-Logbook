@@ -830,6 +830,11 @@ function compareEntriesByDateAndLoggedOrder(firstEntry, secondEntry) {
     return dateComparison;
   }
 
+  const sortOrderComparison = getEntrySortOrder(firstEntry) - getEntrySortOrder(secondEntry);
+  if (sortOrderComparison !== 0) {
+    return sortOrderComparison;
+  }
+
   const firstCreatedAt = getEntryCreatedAtSortValue(firstEntry);
   const secondCreatedAt = getEntryCreatedAtSortValue(secondEntry);
 
@@ -843,11 +848,6 @@ function compareEntriesByDateAndLoggedOrder(firstEntry, secondEntry) {
     if (firstCreatedAt !== secondCreatedAt) {
       return firstCreatedAt - secondCreatedAt;
     }
-  }
-
-  const sortOrderComparison = getEntrySortOrder(firstEntry) - getEntrySortOrder(secondEntry);
-  if (sortOrderComparison !== 0) {
-    return sortOrderComparison;
   }
 
   return String(firstEntry.id || "").localeCompare(String(secondEntry.id || ""));
@@ -1357,12 +1357,19 @@ async function moveEntry(entryId, direction) {
     return;
   }
 
+  const entry = state.entries[currentIndex];
+  const targetEntry = state.entries[targetIndex];
+  if (!canSwapEntryOrder(entry, targetEntry)) {
+    state.syncFeedback = "Entries stay sorted by date. You can only move rows within the same date.";
+    render();
+    return;
+  }
+
   const beforeSnapshot = createHistorySnapshot();
   const reordered = [...state.entries];
-  const [entry] = reordered.splice(currentIndex, 1);
-  reordered.splice(targetIndex, 0, entry);
-  const movedEntry = reordered[targetIndex];
-  movedEntry.sortOrder = getSortOrderBetween(reordered[targetIndex - 1], reordered[targetIndex + 1]);
+  const [movedEntry] = reordered.splice(currentIndex, 1);
+  reordered.splice(targetIndex, 0, movedEntry);
+  movedEntry.sortOrder = getSameDateSortOrderAround(reordered, targetIndex);
   state.entries = reordered;
 
   state.isBusy = true;
@@ -1410,6 +1417,12 @@ function handleDragOver(event) {
     return;
   }
 
+  const draggedEntry = state.entries.find((entry) => entry.id === state.dragId);
+  const targetEntry = state.entries.find((entry) => entry.id === targetCard.dataset.entryId);
+  if (!canSwapEntryOrder(draggedEntry, targetEntry)) {
+    return;
+  }
+
   const bounds = targetCard.getBoundingClientRect();
   const placeAfter = event.clientY > bounds.top + bounds.height / 2;
   targetCard.classList.add(placeAfter ? "drop-after" : "drop-before");
@@ -1435,6 +1448,13 @@ async function handleDrop(event) {
     return;
   }
 
+  if (!canSwapEntryOrder(state.entries[fromIndex], state.entries[targetIndex])) {
+    clearDragMarkers();
+    state.syncFeedback = "Entries stay sorted by date. You can only reorder rows within the same date.";
+    render();
+    return;
+  }
+
   const beforeSnapshot = createHistorySnapshot();
   const reordered = [...state.entries];
   const [draggedEntry] = reordered.splice(fromIndex, 1);
@@ -1445,7 +1465,7 @@ async function handleDrop(event) {
 
   reordered.splice(insertIndex, 0, draggedEntry);
   const movedEntry = reordered[insertIndex];
-  movedEntry.sortOrder = getSortOrderBetween(reordered[insertIndex - 1], reordered[insertIndex + 1]);
+  movedEntry.sortOrder = getSameDateSortOrderAround(reordered, insertIndex);
   state.entries = reordered;
   clearDragMarkers();
   state.isBusy = true;
@@ -1929,10 +1949,10 @@ function renderSyncConsole() {
 function renderManifest() {
   emptyState.hidden = state.entries.length > 0;
   manifestStatus.textContent = isCloudMode()
-    ? "Cloud rows are private to the signed-in pilot account. Entries are sorted by date automatically, and the first row logged on a matching date stays above."
+    ? "Cloud rows are private to the signed-in pilot account. Entries stay sorted by date, and same-date rows can be moved up or down."
     : state.user
-      ? "Cloud data is unavailable right now, so you are viewing the device copy in date order. If two rows share a date, the one logged first stays above."
-      : "Entries are sorted by date automatically on this device. If two rows share a date, the one logged first stays above.";
+      ? "Cloud data is unavailable right now, so you are viewing the device copy in date order. Same-date rows can be moved up or down."
+      : "Entries stay sorted by date on this device. Use Move up/down to adjust rows within the same date.";
   entryList.innerHTML = state.entries
     .map((entry, index) => createEntryCard(entry, index))
     .join("");
@@ -2034,9 +2054,12 @@ function createEntryCard(entry, index) {
   const isActive = entry.id === state.editingId;
   const isSelectedForSum = state.selectedSumIds.has(entry.id);
   const isSelectedForDelete = state.selectedDeleteIds.has(entry.id);
+  const canMoveUp = canMoveEntryByIndex(index, -1);
+  const canMoveDown = canMoveEntryByIndex(index, 1);
+  const canDrag = canMoveUp || canMoveDown;
 
   return `
-    <li class="entry-card ${isActive ? "is-active" : ""} ${isSelectedForSum ? "is-in-sum" : ""} ${isSelectedForDelete ? "is-bulk-selected" : ""}" data-entry-id="${entry.id}">
+    <li class="entry-card ${isActive ? "is-active" : ""} ${isSelectedForSum ? "is-in-sum" : ""} ${isSelectedForDelete ? "is-bulk-selected" : ""}" data-entry-id="${entry.id}" draggable="${canDrag ? "true" : "false"}">
       <div class="entry-card__top">
         <div>
           <p class="entry-card__title">${escapeHtml(config.cardTitle(entry, { formatLedgerDate }))}</p>
@@ -2047,6 +2070,7 @@ function createEntryCard(entry, index) {
             <input class="entry-select__checkbox" type="checkbox" data-bulk-select value="${entry.id}" ${isSelectedForDelete ? "checked" : ""} />
             <span>Select</span>
           </label>
+          ${canDrag ? '<span class="entry-card__handle" aria-label="Drag to reorder same-date rows" title="Drag to reorder same-date rows">:::</span>' : ""}
         </div>
       </div>
       <div class="entry-card__meta">
@@ -2067,6 +2091,8 @@ function createEntryCard(entry, index) {
         <button type="button" class="mini-button ${isSelectedForSum ? "is-selected" : ""}" data-action="toggle-sum">
           ${isSelectedForSum ? "Sum on" : "Use in sum"}
         </button>
+        <button type="button" class="mini-button" data-action="move-up" ${canMoveUp ? "" : 'disabled title="Already first for this date"'}>Move up</button>
+        <button type="button" class="mini-button" data-action="move-down" ${canMoveDown ? "" : 'disabled title="Already last for this date"'}>Move down</button>
         <button type="button" class="mini-button" data-action="delete">Delete</button>
       </div>
     </li>
@@ -2605,6 +2631,36 @@ function getEntryRangeIds(anchorId, targetId) {
   const start = Math.min(anchorIndex, targetIndex);
   const end = Math.max(anchorIndex, targetIndex);
   return state.entries.slice(start, end + 1).map((entry) => entry.id);
+}
+
+function canSwapEntryOrder(firstEntry, secondEntry) {
+  return Boolean(
+    firstEntry &&
+    secondEntry &&
+    getEntryDateSortKey(firstEntry) === getEntryDateSortKey(secondEntry)
+  );
+}
+
+function canMoveEntryByIndex(index, direction) {
+  return canSwapEntryOrder(state.entries[index], state.entries[index + direction]);
+}
+
+function getSameDateSortOrderAround(entries, targetIndex) {
+  const entry = entries[targetIndex];
+  if (!entry) {
+    return 1024;
+  }
+
+  const dateKey = getEntryDateSortKey(entry);
+  const previousEntry = entries
+    .slice(0, targetIndex)
+    .reverse()
+    .find((candidate) => getEntryDateSortKey(candidate) === dateKey);
+  const nextEntry = entries
+    .slice(targetIndex + 1)
+    .find((candidate) => getEntryDateSortKey(candidate) === dateKey);
+
+  return getSortOrderBetween(previousEntry, nextEntry);
 }
 
 function scrollEditorIntoView() {

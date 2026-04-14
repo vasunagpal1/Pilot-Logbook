@@ -1113,6 +1113,10 @@ body::before {
   opacity: 0.55;
 }
 
+.entry-card[draggable="true"] {
+  cursor: grab;
+}
+
 .entry-card.drop-before {
   box-shadow: inset 0 3px 0 var(--gold);
 }
